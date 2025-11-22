@@ -3,9 +3,24 @@ import { pgTable, text, varchar, timestamp, integer, boolean } from "drizzle-orm
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// Users (for authentication)
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+});
+
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+
 // Students/User Profiles
 export const students = pgTable("students", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id"),
   name: text("name").notNull(),
   email: text("email").notNull().unique(),
   year: text("year").notNull(), // Freshman, Sophomore, Junior, Senior
@@ -27,6 +42,24 @@ export const insertStudentSchema = createInsertSchema(students).omit({
 
 export type InsertStudent = z.infer<typeof insertStudentSchema>;
 export type Student = typeof students.$inferSelect;
+
+// Student Matches
+export const matches = pgTable("matches", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  student1Id: varchar("student1_id").notNull(),
+  student2Id: varchar("student2_id").notNull(),
+  compatibilityScore: integer("compatibility_score").notNull(),
+  status: text("status").notNull().default("pending"), // pending, accepted, declined
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const insertMatchSchema = createInsertSchema(matches).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertMatch = z.infer<typeof insertMatchSchema>;
+export type Match = typeof matches.$inferSelect;
 
 // Events
 export const events = pgTable("events", {
