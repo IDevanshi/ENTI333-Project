@@ -635,7 +635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const message = JSON.parse(data.toString());
 
-        if (message.type === "join") {
+        if (message.type === "join" && message.roomId) {
           // Join a chat room
           currentRoom = message.roomId;
           if (!roomConnections.has(currentRoom)) {

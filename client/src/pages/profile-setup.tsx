@@ -64,11 +64,8 @@ export default function ProfileSetup() {
 
   const createProfileMutation = useMutation({
     mutationFn: async (data: InsertStudent) => {
-      return await apiRequest("/api/students", {
-        method: "POST",
-        body: JSON.stringify(data),
-        headers: { "Content-Type": "application/json" },
-      });
+      const response = await apiRequest("POST", "/api/students", data);
+      return await response.json();
     },
     onSuccess: () => {
       toast({
