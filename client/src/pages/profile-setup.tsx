@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertStudentSchema, type InsertStudent } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 
 const INTERESTS_OPTIONS = [
   "Music", "Sports", "Art", "Photography", "Gaming", "Reading", "Cooking",
@@ -35,6 +38,7 @@ export default function ProfileSetup() {
   const [, navigate] = useLocation();
   const [step, setStep] = useState(1);
   const totalSteps = 4;
+  const { toast } = useToast();
 
   const form = useForm<InsertStudent>({
     resolver: zodResolver(insertStudentSchema),
@@ -57,6 +61,30 @@ export default function ProfileSetup() {
   const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
   const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
   const [customCourse, setCustomCourse] = useState("");
+
+  const createProfileMutation = useMutation({
+    mutationFn: async (data: InsertStudent) => {
+      return await apiRequest("/api/students", {
+        method: "POST",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" },
+      });
+    },
+    onSuccess: () => {
+      toast({
+        title: "Profile created!",
+        description: "Your profile has been successfully created.",
+      });
+      navigate("/discover");
+    },
+    onError: (error: any) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error.message || "Failed to create profile. Please try again.",
+      });
+    },
+  });
 
   const toggleSelection = (item: string, list: string[], setter: (list: string[]) => void) => {
     if (list.includes(item)) {
@@ -100,8 +128,7 @@ export default function ProfileSetup() {
 
   const onSubmit = (data: InsertStudent) => {
     console.log("Profile data:", data);
-    // Will connect to API in integration phase
-    navigate("/discover");
+    createProfileMutation.mutate(data);
   };
 
   const progress = (step / totalSteps) * 100;
@@ -368,9 +395,14 @@ export default function ProfileSetup() {
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               ) : (
-                <Button type="submit" className="flex-1" data-testid="button-complete">
+                <Button 
+                  type="submit" 
+                  className="flex-1" 
+                  disabled={createProfileMutation.isPending}
+                  data-testid="button-complete"
+                >
                   <Check className="mr-2 h-4 w-4" />
-                  Complete Profile
+                  {createProfileMutation.isPending ? "Creating Profile..." : "Complete Profile"}
                 </Button>
               )}
             </div>
