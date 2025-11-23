@@ -1,4 +1,4 @@
-import { Home, Users, Calendar, GraduationCap, MessageSquare, Newspaper, MapPin } from "lucide-react";
+import { Home, Users, Calendar, GraduationCap, MessageSquare, Newspaper, MapPin, LogIn, LogOut, UserPlus } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -10,7 +10,10 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarHeader,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
+import { useAuth } from "@/lib/auth";
+import { Button } from "@/components/ui/button";
 
 const menuItems = [
   {
@@ -59,6 +62,7 @@ const menuItems = [
 
 export function AppSidebar() {
   const [location] = useLocation();
+  const { user, logout } = useAuth();
 
   return (
     <Sidebar>
@@ -96,6 +100,52 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
+      <SidebarFooter className="p-4">
+        {user ? (
+          <div className="space-y-2">
+            {user.student && (
+              <div className="px-2 py-1">
+                <p className="text-sm font-medium">{user.student.name}</p>
+                <p className="text-xs text-muted-foreground">{user.username}</p>
+              </div>
+            )}
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={logout}
+              data-testid="button-logout"
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <Button
+              variant="default"
+              className="w-full"
+              asChild
+              data-testid="button-login"
+            >
+              <Link href="/login">
+                <LogIn className="h-4 w-4 mr-2" />
+                Login
+              </Link>
+            </Button>
+            <Button
+              variant="outline"
+              className="w-full"
+              asChild
+              data-testid="button-register"
+            >
+              <Link href="/register">
+                <UserPlus className="h-4 w-4 mr-2" />
+                Register
+              </Link>
+            </Button>
+          </div>
+        )}
+      </SidebarFooter>
     </Sidebar>
   );
 }

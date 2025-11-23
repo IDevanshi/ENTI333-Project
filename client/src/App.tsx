@@ -58,19 +58,10 @@ function Router() {
 }
 
 function AppContent() {
-  const { user } = useAuth();
-  const [location] = useLocation();
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
-
-  const noLayoutRoutes = ["/", "/login", "/register", "/profile-setup"];
-  const showLayout = user && user.student && !noLayoutRoutes.includes(location);
-
-  if (!showLayout) {
-    return <Router />;
-  }
 
   return (
     <SidebarProvider style={style as React.CSSProperties}>
