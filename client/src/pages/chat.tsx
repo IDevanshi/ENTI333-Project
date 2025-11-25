@@ -31,7 +31,7 @@ export default function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: chatRooms = [], isLoading: roomsLoading } = useQuery<ChatRoom[]>({
-    queryKey: ["/api/chat-rooms", user?.student?.id],
+    queryKey: ["/api/my-chat-rooms"],
     enabled: !!user?.student?.id,
   });
 
@@ -126,13 +126,15 @@ export default function Chat() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/messages", selectedRoomId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/chat-rooms", user?.student?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-chat-rooms"] });
     },
   });
 
   const startDirectChatMutation = useMutation({
     mutationFn: async (otherStudent: Student) => {
-      if (!user?.student) return;
+      if (!user?.student) {
+        throw new Error("User not authenticated");
+      }
       
       const response = await apiRequest("POST", "/api/chat-rooms/direct", {
         student1Id: user.student.id,
@@ -142,8 +144,9 @@ export default function Chat() {
       });
       return await response.json();
     },
-    onSuccess: (room: ChatRoom) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/chat-rooms", user?.student?.id] });
+    onSuccess: (room: ChatRoom | undefined) => {
+      if (!room) return;
+      queryClient.invalidateQueries({ queryKey: ["/api/my-chat-rooms"] });
       setSelectedRoomId(room.id);
       setNewChatDialogOpen(false);
       setUserSearchQuery("");

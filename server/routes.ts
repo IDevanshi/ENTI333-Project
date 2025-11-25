@@ -450,10 +450,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get chat rooms for the current authenticated user
+  app.get("/api/my-chat-rooms", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const student = await storage.getStudentByUserId(req.session.userId);
+      if (!student) {
+        return res.json([]);
+      }
+      const rooms = await storage.getChatRoomsByStudent(student.id);
+      res.json(rooms);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch chat rooms" });
+    }
+  });
+
   app.get("/api/chat-rooms/:id", async (req, res) => {
     try {
-      const room = await storage.getChatRoom(req.params.id);
+      const id = req.params.id;
+      
+      // First check if this is a student ID (for backwards compatibility)
+      const studentRooms = await storage.getChatRoomsByStudent(id);
+      if (studentRooms.length > 0) {
+        return res.json(studentRooms);
+      }
+      
+      // Otherwise treat it as a room ID
+      const room = await storage.getChatRoom(id);
       if (!room) {
+        // If no room found, return empty array (might be a new student with no chats)
+        const student = await storage.getStudent(id);
+        if (student) {
+          return res.json([]);
+        }
         return res.status(404).json({ error: "Chat room not found" });
       }
       res.json(room);
