@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, Mail, AlertCircle } from "lucide-react";
+import { UserPlus, Mail } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function Register() {
@@ -30,18 +30,14 @@ export default function Register() {
     return null;
   }
 
-  const isValidEduEmail = (email: string) => {
-    return email.toLowerCase().endsWith('.edu');
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!isValidEduEmail(email)) {
+    if (!email || !email.includes('@')) {
       toast({
         variant: "destructive",
         title: "Invalid email",
-        description: "Please use your university email address (.edu)",
+        description: "Please enter a valid email address",
       });
       return;
     }
@@ -104,7 +100,7 @@ export default function Register() {
         <Alert className="mb-4">
           <Mail className="h-4 w-4" />
           <AlertDescription>
-            You must use a valid university email address (.edu) to register.
+            Please use your university email address to register. We'll send a verification code.
           </AlertDescription>
         </Alert>
 
@@ -127,18 +123,12 @@ export default function Register() {
             <Input
               id="email"
               type="email"
-              placeholder="yourname@university.edu"
+              placeholder="yourname@university.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               data-testid="input-email"
             />
-            {email && !isValidEduEmail(email) && (
-              <p className="text-sm text-destructive flex items-center gap-1">
-                <AlertCircle className="h-3 w-3" />
-                Please use a .edu email address
-              </p>
-            )}
           </div>
 
           <div className="space-y-2">

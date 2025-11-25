@@ -22,9 +22,9 @@ function generateVerificationCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
-// Validate .edu email
-function isValidEduEmail(email: string): boolean {
-  return email.toLowerCase().endsWith('.edu');
+// Validate email format
+function isValidEmail(email: string): boolean {
+  return email.includes('@') && email.includes('.');
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -35,9 +35,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { username, password, email } = insertUserSchema.parse(req.body);
       
-      // Validate .edu email
-      if (!isValidEduEmail(email)) {
-        return res.status(400).json({ error: "Please use a valid university email address (.edu)" });
+      // Validate email format
+      if (!isValidEmail(email)) {
+        return res.status(400).json({ error: "Please use a valid email address" });
       }
 
       const existingUser = await storage.getUserByUsername(username);
