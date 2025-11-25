@@ -109,6 +109,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.put("/api/users/:id", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+    
+    if (req.session.userId !== req.params.id) {
+      return res.status(403).json({ error: "Cannot update other users" });
+    }
+
+    try {
+      const { username } = req.body;
+      
+      if (username) {
+        const existingUser = await storage.getUserByUsername(username);
+        if (existingUser && existingUser.id !== req.params.id) {
+          return res.status(400).json({ error: "Username already taken" });
+        }
+      }
+      
+      const user = await storage.updateUser(req.params.id, { username });
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
   // Student Profile Routes
   app.get("/api/students", async (_req, res) => {
     try {

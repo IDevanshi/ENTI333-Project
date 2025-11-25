@@ -1,4 +1,4 @@
-import { Home, Users, Calendar, GraduationCap, MessageSquare, Newspaper, MapPin, LogIn, LogOut, UserPlus, User } from "lucide-react";
+import { Home, Users, Calendar, GraduationCap, MessageSquare, Newspaper, MapPin, LogIn, LogOut, UserPlus } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -58,12 +58,6 @@ const menuItems = [
     icon: MapPin,
     testId: "nav-meetups",
   },
-  {
-    title: "Profile",
-    url: "/profile",
-    icon: User,
-    testId: "nav-profile",
-  },
 ];
 
 export function AppSidebar() {
@@ -110,10 +104,12 @@ export function AppSidebar() {
         {user ? (
           <div className="space-y-2">
             {user.student && (
-              <div className="px-2 py-1">
-                <p className="text-sm font-medium">{user.student.name}</p>
-                <p className="text-xs text-muted-foreground">{user.username}</p>
-              </div>
+              <Link href="/profile">
+                <div className="px-2 py-2 rounded-md hover-elevate cursor-pointer" data-testid="link-profile">
+                  <p className="text-sm font-medium">{user.student.name}</p>
+                  <p className="text-xs text-muted-foreground">{user.username}</p>
+                </div>
+              </Link>
             )}
             <Button
               variant="outline"
