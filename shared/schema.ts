@@ -80,6 +80,7 @@ export const insertEventSchema = createInsertSchema(events).omit({
   id: true,
   createdAt: true,
 }).extend({
+  date: z.coerce.date(),
   attendees: z.array(z.string()).default([]),
 });
 
