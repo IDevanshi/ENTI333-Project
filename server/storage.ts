@@ -71,6 +71,7 @@ export interface IStorage {
   getChatRoom(id: string): Promise<ChatRoom | undefined>;
   getAllChatRooms(): Promise<ChatRoom[]>;
   getChatRoomsByStudent(studentId: string): Promise<ChatRoom[]>;
+  getDirectChatRoom(student1Id: string, student2Id: string): Promise<ChatRoom | undefined>;
   createChatRoom(room: InsertChatRoom): Promise<ChatRoom>;
   deleteChatRoom(id: string): Promise<boolean>;
 
@@ -298,6 +299,20 @@ export class DatabaseStorage implements IStorage {
       .from(chatRooms)
       .where(sql`${studentId} = ANY(${chatRooms.members})`)
       .orderBy(sql`${chatRooms.lastMessageTime} DESC NULLS LAST`);
+  }
+
+  async getDirectChatRoom(student1Id: string, student2Id: string): Promise<ChatRoom | undefined> {
+    // Find direct chat room between two students
+    const [room] = await db
+      .select()
+      .from(chatRooms)
+      .where(and(
+        eq(chatRooms.type, "direct"),
+        sql`${student1Id} = ANY(${chatRooms.members})`,
+        sql`${student2Id} = ANY(${chatRooms.members})`,
+        sql`array_length(${chatRooms.members}, 1) = 2`
+      ));
+    return room || undefined;
   }
 
   async createChatRoom(insertRoom: InsertChatRoom): Promise<ChatRoom> {

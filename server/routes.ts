@@ -484,6 +484,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Direct chat endpoint - creates or gets existing direct chat between two users
+  app.post("/api/chat-rooms/direct", async (req, res) => {
+    try {
+      const { student1Id, student2Id, student1Name, student2Name } = req.body;
+      
+      if (!student1Id || !student2Id || !student1Name || !student2Name) {
+        return res.status(400).json({ error: "Both student IDs and names are required" });
+      }
+      
+      // Check if direct chat already exists
+      let room = await storage.getDirectChatRoom(student1Id, student2Id);
+      
+      if (!room) {
+        // Create new direct chat room
+        room = await storage.createChatRoom({
+          name: `${student1Name} & ${student2Name}`,
+          type: "direct",
+          members: [student1Id, student2Id],
+        });
+      }
+      
+      res.json(room);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create direct chat" });
+    }
+  });
+
   // Message Routes
   app.get("/api/messages/:roomId", async (req, res) => {
     try {
