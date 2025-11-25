@@ -1,74 +1,127 @@
 import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StudyGroupCard } from "@/components/study-group-card";
-import { Plus, Search } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Plus, Search, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { X } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { insertStudyGroupSchema, type InsertStudyGroup, type StudyGroup } from "@shared/schema";
+import { useAuth } from "@/lib/auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
 
-// Mock study groups data
-const mockGroups = [
-  {
-    id: "1",
-    name: "CS Algorithm Study Circle",
-    course: "CS301",
-    description: "Weekly meetups to tackle tough algorithm problems together. We focus on LeetCode and interview prep.",
-    image: "",
-    creatorId: "user1",
-    members: ["1", "2", "3", "4", "5"],
-    tags: ["Algorithms", "Data Structures", "Interview Prep"],
-    maxMembers: 10,
-    isPrivate: false,
-    createdAt: new Date(),
-  },
-  {
-    id: "2",
-    name: "Calculus Homework Help",
-    course: "MATH210",
-    description: "Struggling with calculus? Join us! We meet twice a week to work through problem sets.",
-    image: "",
-    creatorId: "user2",
-    members: ["1", "2", "3", "4", "5", "6", "7"],
-    tags: ["Calculus", "Problem Sets", "Homework"],
-    maxMembers: 15,
-    isPrivate: false,
-    createdAt: new Date(),
-  },
-  {
-    id: "3",
-    name: "Business Strategy Mastermind",
-    course: "BUS401",
-    description: "Advanced business students collaborating on case studies and projects.",
-    image: "",
-    creatorId: "user3",
-    members: ["1", "2", "3"],
-    tags: ["Business", "Case Studies", "Projects"],
-    maxMembers: 8,
-    isPrivate: true,
-    createdAt: new Date(),
-  },
-];
+const groupFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  course: z.string().min(1, "Course is required"),
+  description: z.string().min(1, "Description is required"),
+  maxMembers: z.string().optional(),
+  isPrivate: z.boolean().default(false),
+});
+
+type GroupFormData = z.infer<typeof groupFormSchema>;
 
 export default function StudyGroups() {
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
-  const [memberGroups, setMemberGroups] = useState<Set<string>>(new Set(["1"]));
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newGroupTags, setNewGroupTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
 
-  const toggleMembership = (groupId: string) => {
-    const newMembership = new Set(memberGroups);
-    if (newMembership.has(groupId)) {
-      newMembership.delete(groupId);
-    } else {
-      newMembership.add(groupId);
-    }
-    setMemberGroups(newMembership);
+  const form = useForm<GroupFormData>({
+    resolver: zodResolver(groupFormSchema),
+    defaultValues: {
+      name: "",
+      course: "",
+      description: "",
+      maxMembers: "",
+      isPrivate: false,
+    },
+  });
+
+  const { data: groups, isLoading } = useQuery<StudyGroup[]>({
+    queryKey: ["/api/study-groups"],
+  });
+
+  const createGroupMutation = useMutation({
+    mutationFn: async (data: GroupFormData) => {
+      if (!user?.student?.id) throw new Error("Not authenticated");
+      const groupData: InsertStudyGroup = {
+        name: data.name,
+        course: data.course,
+        description: data.description,
+        creatorId: user.student.id,
+        members: [user.student.id],
+        tags: newGroupTags,
+        maxMembers: data.maxMembers ? parseInt(data.maxMembers) : null,
+        isPrivate: data.isPrivate,
+      };
+      const response = await apiRequest("POST", "/api/study-groups", groupData);
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/study-groups"] });
+      toast({
+        title: "Group created!",
+        description: "Your study group has been successfully created.",
+      });
+      setDialogOpen(false);
+      form.reset();
+      setNewGroupTags([]);
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to create study group. Please try again.",
+      });
+    },
+  });
+
+  const joinLeaveMutation = useMutation({
+    mutationFn: async ({ groupId, action }: { groupId: string; action: "join" | "leave" }) => {
+      if (!user?.student?.id) throw new Error("Not authenticated");
+      const endpoint = action === "join" ? `/api/study-groups/${groupId}/join` : `/api/study-groups/${groupId}/leave`;
+      const method = action === "join" ? "POST" : "DELETE";
+      const response = await apiRequest(method, endpoint, {
+        studentId: user.student.id,
+      });
+      return await response.json();
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/study-groups"] });
+      toast({
+        title: variables.action === "join" ? "Joined group!" : "Left group",
+        description: variables.action === "join" 
+          ? "You've joined this study group."
+          : "You've left this study group.",
+      });
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to update membership. Please try again.",
+      });
+    },
+  });
+
+  const handleMembership = (groupId: string, isMember: boolean) => {
+    joinLeaveMutation.mutate({
+      groupId,
+      action: isMember ? "leave" : "join",
+    });
   };
 
   const addTag = () => {
@@ -82,11 +135,37 @@ export default function StudyGroups() {
     setNewGroupTags(newGroupTags.filter(t => t !== tag));
   };
 
-  const filteredGroups = mockGroups.filter((group) =>
+  const onSubmit = (data: GroupFormData) => {
+    createGroupMutation.mutate(data);
+  };
+
+  const filteredGroups = groups?.filter((group) =>
     group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     group.course.toLowerCase().includes(searchQuery.toLowerCase()) ||
     group.description.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  ) || [];
+
+  const isMember = (group: StudyGroup) => {
+    return user?.student?.id ? group.members.includes(user.student.id) : false;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">Study Groups</h1>
+            <p className="text-muted-foreground">Loading groups...</p>
+          </div>
+        </div>
+        <div className="grid md:grid-cols-2 gap-6">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-48 w-full rounded-lg" />
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -100,7 +179,7 @@ export default function StudyGroups() {
 
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogTrigger asChild>
-            <Button data-testid="button-create-group">
+            <Button data-testid="button-create-group" disabled={!user?.student}>
               <Plus className="mr-2 h-4 w-4" />
               Create Group
             </Button>
@@ -109,68 +188,123 @@ export default function StudyGroups() {
             <DialogHeader>
               <DialogTitle>Create Study Group</DialogTitle>
             </DialogHeader>
-            <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); setDialogOpen(false); }}>
-              <div>
-                <Label htmlFor="group-name">Group Name</Label>
-                <Input id="group-name" placeholder="CS Algorithm Study Circle" data-testid="input-group-name" />
-              </div>
-              <div>
-                <Label htmlFor="group-course">Course Code</Label>
-                <Input id="group-course" placeholder="CS301" data-testid="input-group-course" />
-              </div>
-              <div>
-                <Label htmlFor="group-description">Description</Label>
-                <Textarea
-                  id="group-description"
-                  placeholder="What will your group focus on?"
-                  rows={3}
-                  data-testid="input-group-description"
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Group Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="CS Algorithm Study Circle" {...field} data-testid="input-group-name" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-              <div>
-                <Label htmlFor="group-tags">Tags</Label>
-                <div className="flex gap-2 mb-2">
-                  <Input
-                    id="group-tags"
-                    placeholder="Add a tag..."
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
-                    data-testid="input-group-tag"
-                  />
-                  <Button type="button" onClick={addTag} data-testid="button-add-tag">
-                    Add
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {newGroupTags.map((tag, idx) => (
-                    <Badge key={idx} variant="secondary" className="rounded-full gap-1">
-                      {tag}
-                      <button
-                        type="button"
-                        onClick={() => removeTag(tag)}
-                        className="hover-elevate rounded-full"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="course"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Course Code</FormLabel>
+                      <FormControl>
+                        <Input placeholder="CS301" {...field} data-testid="input-group-course" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Description</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="What will your group focus on?"
+                          rows={3}
+                          {...field}
+                          data-testid="input-group-description"
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <div>
-                  <Label htmlFor="group-capacity">Max Members (Optional)</Label>
-                  <Input id="group-capacity" type="number" placeholder="10" data-testid="input-group-capacity" />
+                  <Label htmlFor="group-tags">Tags</Label>
+                  <div className="flex gap-2 mb-2 mt-1">
+                    <Input
+                      id="group-tags"
+                      placeholder="Add a tag..."
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addTag())}
+                      data-testid="input-group-tag"
+                    />
+                    <Button type="button" onClick={addTag} data-testid="button-add-tag">
+                      Add
+                    </Button>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {newGroupTags.map((tag, idx) => (
+                      <Badge key={idx} variant="secondary" className="rounded-full gap-1">
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => removeTag(tag)}
+                          className="hover-elevate rounded-full"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Switch id="group-private" data-testid="switch-group-private" />
-                  <Label htmlFor="group-private">Private Group</Label>
+                <div className="grid md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="maxMembers"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Max Members (Optional)</FormLabel>
+                        <FormControl>
+                          <Input type="number" placeholder="10" {...field} data-testid="input-group-capacity" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="isPrivate"
+                    render={({ field }) => (
+                      <FormItem className="flex items-center space-x-2 pt-6">
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            data-testid="switch-group-private"
+                          />
+                        </FormControl>
+                        <FormLabel className="!mt-0">Private Group</FormLabel>
+                      </FormItem>
+                    )}
+                  />
                 </div>
-              </div>
-              <Button type="submit" className="w-full" data-testid="button-submit-group">
-                Create Study Group
-              </Button>
-            </form>
+                <Button 
+                  type="submit" 
+                  className="w-full" 
+                  disabled={createGroupMutation.isPending}
+                  data-testid="button-submit-group"
+                >
+                  {createGroupMutation.isPending ? "Creating..." : "Create Study Group"}
+                </Button>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
       </div>
@@ -199,8 +333,8 @@ export default function StudyGroups() {
                 <StudyGroupCard
                   key={group.id}
                   group={group}
-                  isMember={memberGroups.has(group.id)}
-                  onJoin={() => toggleMembership(group.id)}
+                  isMember={isMember(group)}
+                  onJoin={() => handleMembership(group.id, isMember(group))}
                 />
               ))}
             </div>
@@ -209,23 +343,29 @@ export default function StudyGroups() {
               No study groups found matching "{searchQuery}"
             </div>
           ) : (
-            <div className="text-center py-12 text-muted-foreground" data-testid="empty-groups">
-              No study groups available. Create the first one!
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4">
+                <Users className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">No Study Groups Yet</h3>
+              <p className="text-muted-foreground mb-4" data-testid="empty-groups">
+                Be the first to create a study group!
+              </p>
             </div>
           )}
         </TabsContent>
 
         <TabsContent value="my-groups" className="mt-6">
-          {filteredGroups.filter(g => memberGroups.has(g.id)).length > 0 ? (
+          {filteredGroups.filter(g => isMember(g)).length > 0 ? (
             <div className="grid md:grid-cols-2 gap-6">
               {filteredGroups
-                .filter(g => memberGroups.has(g.id))
+                .filter(g => isMember(g))
                 .map((group) => (
                   <StudyGroupCard
                     key={group.id}
                     group={group}
                     isMember={true}
-                    onJoin={() => toggleMembership(group.id)}
+                    onJoin={() => handleMembership(group.id, true)}
                   />
                 ))}
             </div>
