@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,12 +16,17 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  if (user) {
-    if (user.student) {
-      navigate("/discover");
-    } else {
-      navigate("/profile-setup");
+  useEffect(() => {
+    if (user) {
+      if (user.student) {
+        navigate("/discover");
+      } else {
+        navigate("/profile-setup");
+      }
     }
+  }, [user, navigate]);
+
+  if (user) {
     return null;
   }
 
