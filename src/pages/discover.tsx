@@ -36,19 +36,21 @@ export default function Discover() {
   });
 
   const createMatchMutation = useMutation({
-    mutationFn: async ({ student1Id, student2Id, score }: { student1Id: string; student2Id: string; score: number }) => {
+    mutationFn: async ({ student1Id, student2Id, score, studentName }: { student1Id: string; student2Id: string; score: number; studentName: string }) => {
       const response = await apiRequest("POST", "/api/matches", {
         student1Id,
         student2Id,
         matchScore: score,
       });
-      return await response.json();
+      return { data: await response.json(), studentName };
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      setConnections(prev => [...prev, result.data.student2Id]);
       toast({
         title: "Connection made!",
-        description: "You've connected with a new student.",
+        description: `You've connected with ${result.studentName}.`,
       });
+      moveToNext();
     },
     onError: () => {
       toast({
@@ -100,7 +102,7 @@ export default function Discover() {
 
   const currentMatch = matches?.[currentIndex];
 
-  const handleSkip = () => {
+  const moveToNext = () => {
     if (currentIndex < (matches?.length || 0) - 1) {
       setCurrentIndex(currentIndex + 1);
       setExpandedProfile(false);
@@ -109,16 +111,19 @@ export default function Discover() {
     }
   };
 
+  const handleSkip = () => {
+    moveToNext();
+  };
+
   const handleConnect = () => {
     if (currentMatch && user?.student?.id) {
-      setConnections([...connections, currentMatch.student.id]);
       createMatchMutation.mutate({
         student1Id: user.student.id,
         student2Id: currentMatch.student.id,
         score: currentMatch.score,
+        studentName: currentMatch.student.name,
       });
     }
-    handleSkip();
   };
 
   if (!currentMatch || currentIndex >= (matches?.length || 0)) {

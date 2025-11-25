@@ -57,7 +57,7 @@ export default function Home() {
           </p>
           
           <div className="flex flex-wrap gap-4 justify-center">
-            <Link href="/profile/setup">
+            <Link href="/profile-setup">
               <Button
                 size="lg"
                 className="text-lg px-8 bg-primary/90 backdrop-blur-md hover:bg-primary border border-primary-border"
@@ -111,7 +111,7 @@ export default function Home() {
           <p className="text-lg text-muted-foreground mb-8">
             Join thousands of students building meaningful connections on campus
           </p>
-          <Link href="/profile/setup">
+          <Link href="/profile-setup">
             <Button size="lg" className="text-lg px-8" data-testid="button-create-profile">
               Create Your Profile
             </Button>

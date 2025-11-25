@@ -1,4 +1,4 @@
-import { Home, Users, Calendar, GraduationCap, MessageSquare, Newspaper, MapPin, LogIn, LogOut, UserPlus } from "lucide-react";
+import { Home, Users, Calendar, GraduationCap, MessageSquare, Newspaper, MapPin, LogIn, LogOut, UserPlus, User } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import {
   Sidebar,
@@ -57,6 +57,12 @@ const menuItems = [
     url: "/meetups",
     icon: MapPin,
     testId: "nav-meetups",
+  },
+  {
+    title: "Profile",
+    url: "/profile",
+    icon: User,
+    testId: "nav-profile",
   },
 ];
 
