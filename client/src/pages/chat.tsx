@@ -32,6 +32,13 @@ export default function Chat() {
 
   const { data: chatRooms = [], isLoading: roomsLoading } = useQuery<ChatRoom[]>({
     queryKey: ["/api/chat-rooms", user?.student?.id],
+    queryFn: async () => {
+      const res = await fetch(`/api/chat-rooms?studentId=${user?.student?.id}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch chat rooms");
+      return res.json();
+    },
     enabled: !!user?.student?.id,
   });
 
@@ -132,7 +139,9 @@ export default function Chat() {
 
   const startDirectChatMutation = useMutation({
     mutationFn: async (otherStudent: Student) => {
-      if (!user?.student) return;
+      if (!user?.student) {
+        throw new Error("User not authenticated");
+      }
       
       const response = await apiRequest("POST", "/api/chat-rooms/direct", {
         student1Id: user.student.id,
@@ -142,7 +151,8 @@ export default function Chat() {
       });
       return await response.json();
     },
-    onSuccess: (room: ChatRoom) => {
+    onSuccess: (room: ChatRoom | undefined) => {
+      if (!room) return;
       queryClient.invalidateQueries({ queryKey: ["/api/chat-rooms", user?.student?.id] });
       setSelectedRoomId(room.id);
       setNewChatDialogOpen(false);
