@@ -84,7 +84,7 @@ export default function Profile() {
 
   const removeConnectionMutation = useMutation({
     mutationFn: async (matchId: string) => {
-      await apiRequest("DELETE", `/api/matches/${matchId}`, {});
+      await apiRequest("DELETE", `/api/matches/${matchId}`);
     },
     onSuccess: () => {
       toast({
@@ -92,6 +92,13 @@ export default function Profile() {
         description: "You are no longer connected.",
       });
       queryClient.invalidateQueries({ queryKey: ["/api/matches"] });
+    },
+    onError: () => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to remove connection. Please try again.",
+      });
     },
   });
 
