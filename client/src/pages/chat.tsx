@@ -4,13 +4,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Send, Search, MessageCircle, Plus, Users, User } from "lucide-react";
+import { Send, Search, MessageCircle, Plus, Users, User, Trash2, MoreVertical } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { useLocation } from "wouter";
+import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
@@ -18,10 +19,27 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { ChatRoom, Message, Student } from "@shared/schema";
 
 export default function Chat() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [, setLocation] = useLocation();
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState("");
@@ -29,6 +47,8 @@ export default function Chat() {
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [wsMessages, setWsMessages] = useState<Message[]>([]);
   const [newChatDialogOpen, setNewChatDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [roomToDelete, setRoomToDelete] = useState<ChatRoom | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -154,6 +174,43 @@ export default function Chat() {
       setUserSearchQuery("");
     },
   });
+
+  const deleteChatMutation = useMutation({
+    mutationFn: async (roomId: string) => {
+      await apiRequest("DELETE", `/api/chat-rooms/${roomId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/my-chat-rooms"] });
+      if (roomToDelete?.id === selectedRoomId) {
+        setSelectedRoomId(null);
+      }
+      setRoomToDelete(null);
+      setDeleteDialogOpen(false);
+      toast({
+        title: "Chat deleted",
+        description: "The conversation has been removed.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to delete chat. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteChat = (room: ChatRoom, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRoomToDelete(room);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteChat = () => {
+    if (roomToDelete) {
+      deleteChatMutation.mutate(roomToDelete.id);
+    }
+  };
 
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,12 +352,12 @@ export default function Chat() {
               </div>
             ) : (
               filteredRooms.map((room) => (
-                <button
+                <div
                   key={room.id}
-                  onClick={() => setSelectedRoomId(room.id)}
-                  className={`w-full p-3 rounded-lg text-left hover-elevate ${
+                  className={`group relative w-full p-3 rounded-lg text-left hover-elevate cursor-pointer ${
                     selectedRoomId === room.id ? "bg-muted" : ""
                   }`}
+                  onClick={() => setSelectedRoomId(room.id)}
                   data-testid={`chat-room-${room.id}`}
                 >
                   <div className="flex items-start gap-3">
@@ -310,11 +367,36 @@ export default function Chat() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 mb-1">
                         <h3 className="font-semibold text-sm truncate">{getRoomDisplayName(room)}</h3>
-                        {room.lastMessageTime && (
-                          <span className="text-xs text-muted-foreground shrink-0">
-                            {format(new Date(room.lastMessageTime), "h:mm a")}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-1 shrink-0">
+                          {room.lastMessageTime && (
+                            <span className="text-xs text-muted-foreground">
+                              {format(new Date(room.lastMessageTime), "h:mm a")}
+                            </span>
+                          )}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 invisible group-hover:visible"
+                                onClick={(e) => e.stopPropagation()}
+                                data-testid={`button-chat-options-${room.id}`}
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={(e) => handleDeleteChat(room, e)}
+                                data-testid={`button-delete-chat-${room.id}`}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Chat
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
                       <div className="flex items-center justify-between gap-2">
                         <p className="text-sm text-muted-foreground truncate">
@@ -328,7 +410,7 @@ export default function Chat() {
                       </div>
                     </div>
                   </div>
-                </button>
+                </div>
               ))
             )}
           </div>
@@ -452,6 +534,32 @@ export default function Chat() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Chat</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this conversation with{" "}
+              <span className="font-medium">
+                {roomToDelete ? getRoomDisplayName(roomToDelete) : ""}
+              </span>
+              ? This will remove all messages and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteChat}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteChatMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteChatMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
