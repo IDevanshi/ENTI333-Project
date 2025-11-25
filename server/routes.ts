@@ -195,13 +195,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const allStudents = await storage.getAllStudents();
+      
+      // Get existing matches to exclude students already connected
+      const existingMatches = await storage.getMatches(studentId);
+      const connectedStudentIds = new Set(
+        existingMatches.map(m => 
+          m.student1Id === studentId ? m.student2Id : m.student1Id
+        )
+      );
+      
       const matches = allStudents
-        .filter((s) => s.id !== studentId)
+        .filter((s) => s.id !== studentId && !connectedStudentIds.has(s.id))
         .map((student) => {
           const score = calculateCompatibilityScore(currentStudent, student);
           return { student, score };
         })
-        .filter((match) => match.score >= 60)
         .sort((a, b) => b.score - a.score);
 
       res.json(matches);

@@ -32,6 +32,12 @@ export default function Chat() {
 
   const { data: chatRooms = [], isLoading: roomsLoading } = useQuery<ChatRoom[]>({
     queryKey: ["/api/chat-rooms", user?.student?.id],
+    queryFn: async () => {
+      if (!user?.student?.id) return [];
+      const response = await fetch(`/api/chat-rooms?studentId=${user.student.id}`);
+      if (!response.ok) throw new Error("Failed to fetch chat rooms");
+      return response.json();
+    },
     enabled: !!user?.student?.id,
   });
 
