@@ -14,8 +14,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { insertStudentSchema, type InsertStudent } from "@shared/schema";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 
 const INTERESTS_OPTIONS = [
   "Music", "Sports", "Art", "Photography", "Gaming", "Reading", "Cooking",
@@ -39,6 +40,7 @@ export default function ProfileSetup() {
   const [step, setStep] = useState(1);
   const totalSteps = 4;
   const { toast } = useToast();
+  const { refreshUser } = useAuth();
 
   const form = useForm<InsertStudent>({
     resolver: zodResolver(insertStudentSchema),
@@ -67,7 +69,8 @@ export default function ProfileSetup() {
       const response = await apiRequest("POST", "/api/students", data);
       return await response.json();
     },
-    onSuccess: () => {
+    onSuccess: async () => {
+      await refreshUser();
       toast({
         title: "Profile created!",
         description: "Your profile has been successfully created.",
