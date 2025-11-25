@@ -469,8 +469,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/chat-rooms/:id", async (req, res) => {
     try {
-      const room = await storage.getChatRoom(req.params.id);
+      const id = req.params.id;
+      
+      // First check if this is a student ID (for backwards compatibility)
+      const studentRooms = await storage.getChatRoomsByStudent(id);
+      if (studentRooms.length > 0) {
+        return res.json(studentRooms);
+      }
+      
+      // Otherwise treat it as a room ID
+      const room = await storage.getChatRoom(id);
       if (!room) {
+        // If no room found, return empty array (might be a new student with no chats)
+        const student = await storage.getStudent(id);
+        if (student) {
+          return res.json([]);
+        }
         return res.status(404).json({ error: "Chat room not found" });
       }
       res.json(room);
