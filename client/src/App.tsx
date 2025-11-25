@@ -24,7 +24,7 @@ function Router() {
   const { user, isLoading } = useAuth();
   const [location] = useLocation();
 
-  const publicRoutes = ["/", "/login", "/register"];
+  const publicRoutes = ["/", "/login", "/register", "/events", "/groups", "/news"];
   const isPublicRoute = publicRoutes.includes(location);
 
   if (isLoading) {
