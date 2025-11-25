@@ -34,8 +34,11 @@ export interface IStorage {
   // User methods (auth)
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined>;
+  setVerificationCode(userId: string, code: string, expiry: Date): Promise<void>;
+  verifyEmail(userId: string): Promise<User | undefined>;
 
   // Student profile methods
   getStudent(id: string): Promise<Student | undefined>;
@@ -114,6 +117,11 @@ export class DatabaseStorage implements IStorage {
     return user || undefined;
   }
 
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
+
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values(insertUser).returning();
     return user;
@@ -124,6 +132,29 @@ export class DatabaseStorage implements IStorage {
       .update(users)
       .set(updates)
       .where(eq(users.id, id))
+      .returning();
+    return updated || undefined;
+  }
+
+  async setVerificationCode(userId: string, code: string, expiry: Date): Promise<void> {
+    await db
+      .update(users)
+      .set({ 
+        verificationCode: code, 
+        verificationExpiry: expiry 
+      })
+      .where(eq(users.id, userId));
+  }
+
+  async verifyEmail(userId: string): Promise<User | undefined> {
+    const [updated] = await db
+      .update(users)
+      .set({ 
+        emailVerified: true, 
+        verificationCode: null, 
+        verificationExpiry: null 
+      })
+      .where(eq(users.id, userId))
       .returning();
     return updated || undefined;
   }

@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import bcrypt from "bcryptjs";
 import { storage } from "./storage";
+import { sendVerificationEmail } from "./resend";
 import {
   insertUserSchema,
   insertStudentSchema,
@@ -16,29 +17,141 @@ import {
   type Student,
 } from "@shared/schema";
 
+// Generate a 6-digit verification code
+function generateVerificationCode(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+
+// Validate .edu email
+function isValidEduEmail(email: string): boolean {
+  return email.toLowerCase().endsWith('.edu');
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
 
   // Authentication Routes
   app.post("/api/auth/register", async (req, res) => {
     try {
-      const { username, password } = insertUserSchema.parse(req.body);
+      const { username, password, email } = insertUserSchema.parse(req.body);
       
+      // Validate .edu email
+      if (!isValidEduEmail(email)) {
+        return res.status(400).json({ error: "Please use a valid university email address (.edu)" });
+      }
+
       const existingUser = await storage.getUserByUsername(username);
       if (existingUser) {
         return res.status(400).json({ error: "Username already exists" });
+      }
+
+      const existingEmail = await storage.getUserByEmail(email);
+      if (existingEmail) {
+        return res.status(400).json({ error: "Email already registered" });
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
       const user = await storage.createUser({
         username,
         password: hashedPassword,
+        email,
       });
 
+      // Generate verification code and send email
+      const verificationCode = generateVerificationCode();
+      const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+      await storage.setVerificationCode(user.id, verificationCode, expiry);
+      
+      // Send verification email
+      const emailSent = await sendVerificationEmail(email, verificationCode);
+      if (!emailSent) {
+        console.error("Failed to send verification email to:", email);
+      }
+
       req.session.userId = user.id;
-      res.status(201).json({ id: user.id, username: user.username });
+      res.status(201).json({ 
+        id: user.id, 
+        username: user.username,
+        email: user.email,
+        emailVerified: false,
+        requiresVerification: true
+      });
     } catch (error) {
+      console.error("Registration error:", error);
       res.status(400).json({ error: "Invalid registration data" });
+    }
+  });
+
+  // Verify email with code
+  app.post("/api/auth/verify-email", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const { code } = req.body;
+      if (!code) {
+        return res.status(400).json({ error: "Verification code required" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (user.emailVerified) {
+        return res.json({ message: "Email already verified" });
+      }
+
+      if (!user.verificationCode || !user.verificationExpiry) {
+        return res.status(400).json({ error: "No verification code found. Please request a new one." });
+      }
+
+      if (new Date() > new Date(user.verificationExpiry)) {
+        return res.status(400).json({ error: "Verification code expired. Please request a new one." });
+      }
+
+      if (user.verificationCode !== code) {
+        return res.status(400).json({ error: "Invalid verification code" });
+      }
+
+      await storage.verifyEmail(user.id);
+      res.json({ message: "Email verified successfully" });
+    } catch (error) {
+      console.error("Verification error:", error);
+      res.status(500).json({ error: "Verification failed" });
+    }
+  });
+
+  // Resend verification email
+  app.post("/api/auth/resend-verification", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      if (user.emailVerified) {
+        return res.json({ message: "Email already verified" });
+      }
+
+      const verificationCode = generateVerificationCode();
+      const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+      await storage.setVerificationCode(user.id, verificationCode, expiry);
+      
+      const emailSent = await sendVerificationEmail(user.email, verificationCode);
+      if (!emailSent) {
+        return res.status(500).json({ error: "Failed to send verification email" });
+      }
+
+      res.json({ message: "Verification email sent" });
+    } catch (error) {
+      console.error("Resend verification error:", error);
+      res.status(500).json({ error: "Failed to resend verification email" });
     }
   });
 
@@ -70,6 +183,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         id: user.id,
         username: user.username,
+        email: user.email,
+        emailVerified: user.emailVerified,
         student: student || null,
       });
     } catch (error) {
@@ -102,6 +217,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({
         id: user.id,
         username: user.username,
+        email: user.email,
+        emailVerified: user.emailVerified,
         student: student || null,
       });
     } catch (error) {
