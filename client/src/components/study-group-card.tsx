@@ -9,13 +9,18 @@ interface StudyGroupCardProps {
   group: StudyGroup;
   onJoin?: () => void;
   isMember?: boolean;
+  onClick?: () => void;
 }
 
-export function StudyGroupCard({ group, onJoin, isMember }: StudyGroupCardProps) {
+export function StudyGroupCard({ group, onJoin, isMember, onClick }: StudyGroupCardProps) {
   const memberCount = group.members.length;
 
   return (
-    <Card className="p-6 space-y-4 hover-elevate" data-testid={`card-group-${group.id}`}>
+    <Card 
+      className="p-6 space-y-4 hover-elevate cursor-pointer" 
+      data-testid={`card-group-${group.id}`}
+      onClick={onClick}
+    >
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-2">
@@ -76,7 +81,10 @@ export function StudyGroupCard({ group, onJoin, isMember }: StudyGroupCardProps)
           <Button
             size="sm"
             variant={isMember ? "outline" : "default"}
-            onClick={onJoin}
+            onClick={(e) => {
+              e.stopPropagation();
+              onJoin();
+            }}
             data-testid={`button-join-${group.id}`}
           >
             {isMember ? "Leave" : group.isPrivate ? "Request" : "Join"}

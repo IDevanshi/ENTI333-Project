@@ -4,14 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { StudyGroupCard } from "@/components/study-group-card";
+import { StudyGroupDetailDialog } from "@/components/study-group-detail-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Search, Users } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Plus, Search, Users, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { X } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -38,6 +38,8 @@ export default function StudyGroups() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [newGroupTags, setNewGroupTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
+  const [selectedGroup, setSelectedGroup] = useState<StudyGroup | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
   const form = useForm<GroupFormData>({
     resolver: zodResolver(groupFormSchema),
@@ -187,6 +189,7 @@ export default function StudyGroups() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create Study Group</DialogTitle>
+              <DialogDescription>Fill in the details to create a new study group.</DialogDescription>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -334,7 +337,11 @@ export default function StudyGroups() {
                   key={group.id}
                   group={group}
                   isMember={isMember(group)}
-                  onJoin={() => handleMembership(group.id, isMember(group))}
+                  onJoin={user?.student ? () => handleMembership(group.id, isMember(group)) : undefined}
+                  onClick={() => {
+                    setSelectedGroup(group);
+                    setDetailDialogOpen(true);
+                  }}
                 />
               ))}
             </div>
@@ -365,7 +372,11 @@ export default function StudyGroups() {
                     key={group.id}
                     group={group}
                     isMember={true}
-                    onJoin={() => handleMembership(group.id, true)}
+                    onJoin={user?.student ? () => handleMembership(group.id, true) : undefined}
+                    onClick={() => {
+                      setSelectedGroup(group);
+                      setDetailDialogOpen(true);
+                    }}
                   />
                 ))}
             </div>
@@ -376,6 +387,15 @@ export default function StudyGroups() {
           )}
         </TabsContent>
       </Tabs>
+
+      <StudyGroupDetailDialog
+        group={selectedGroup}
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+        onJoin={selectedGroup ? () => handleMembership(selectedGroup.id, isMember(selectedGroup)) : undefined}
+        isMember={selectedGroup ? isMember(selectedGroup) : false}
+        isLoggedIn={!!user?.student}
+      />
     </div>
   );
 }
