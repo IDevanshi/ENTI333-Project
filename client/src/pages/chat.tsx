@@ -4,30 +4,45 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Send, Search, MessageCircle } from "lucide-react";
+import { Send, Search, MessageCircle, Plus, Users } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
-import type { ChatRoom, Message } from "@shared/schema";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import type { ChatRoom, Message, Student } from "@shared/schema";
 
 export default function Chat() {
   const { user } = useAuth();
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
+  const [userSearchQuery, setUserSearchQuery] = useState("");
   const [wsMessages, setWsMessages] = useState<Message[]>([]);
+  const [newChatDialogOpen, setNewChatDialogOpen] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: chatRooms = [], isLoading: roomsLoading } = useQuery<ChatRoom[]>({
-    queryKey: ["/api/chat-rooms"],
+    queryKey: ["/api/chat-rooms", user?.student?.id],
+    enabled: !!user?.student?.id,
   });
 
   const { data: roomMessages = [], isLoading: messagesLoading } = useQuery<Message[]>({
     queryKey: ["/api/messages", selectedRoomId],
     enabled: !!selectedRoomId,
+  });
+
+  const { data: allStudents = [] } = useQuery<Student[]>({
+    queryKey: ["/api/students"],
+    enabled: newChatDialogOpen,
   });
 
   const selectedRoom = chatRooms.find(r => r.id === selectedRoomId);
@@ -39,6 +54,11 @@ export default function Chat() {
 
   const filteredRooms = chatRooms.filter((room) =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const otherStudents = allStudents.filter(
+    s => s.id !== user?.student?.id && 
+    s.name.toLowerCase().includes(userSearchQuery.toLowerCase())
   );
 
   useEffect(() => {
@@ -106,7 +126,27 @@ export default function Chat() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/messages", selectedRoomId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/chat-rooms"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/chat-rooms", user?.student?.id] });
+    },
+  });
+
+  const startDirectChatMutation = useMutation({
+    mutationFn: async (otherStudent: Student) => {
+      if (!user?.student) return;
+      
+      const response = await apiRequest("POST", "/api/chat-rooms/direct", {
+        student1Id: user.student.id,
+        student2Id: otherStudent.id,
+        student1Name: user.student.name,
+        student2Name: otherStudent.name,
+      });
+      return await response.json();
+    },
+    onSuccess: (room: ChatRoom) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/chat-rooms", user?.student?.id] });
+      setSelectedRoomId(room.id);
+      setNewChatDialogOpen(false);
+      setUserSearchQuery("");
     },
   });
 
@@ -116,6 +156,18 @@ export default function Chat() {
       sendMessageMutation.mutate(messageInput.trim());
       setMessageInput("");
     }
+  };
+
+  const handleStartChat = (student: Student) => {
+    startDirectChatMutation.mutate(student);
+  };
+
+  const getRoomDisplayName = (room: ChatRoom) => {
+    if (room.type === "direct" && user?.student) {
+      const names = room.name.split(" & ");
+      return names.find(n => n !== user.student?.name) || room.name;
+    }
+    return room.name;
   };
 
   if (!user) {
@@ -150,7 +202,62 @@ export default function Chat() {
     <div className="h-screen flex overflow-hidden">
       <div className="w-80 border-r flex flex-col bg-card">
         <div className="p-4 border-b">
-          <h2 className="text-xl font-bold mb-3">Messages</h2>
+          <div className="flex items-center justify-between gap-2 mb-3">
+            <h2 className="text-xl font-bold">Messages</h2>
+            <Dialog open={newChatDialogOpen} onOpenChange={setNewChatDialogOpen}>
+              <DialogTrigger asChild>
+                <Button size="icon" variant="ghost" data-testid="button-new-chat">
+                  <Plus className="h-5 w-5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md" aria-describedby={undefined}>
+                <DialogHeader>
+                  <DialogTitle>Start New Chat</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search users..."
+                      className="pl-9"
+                      value={userSearchQuery}
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                      data-testid="input-search-users"
+                    />
+                  </div>
+                  <ScrollArea className="h-64">
+                    <div className="space-y-1">
+                      {otherStudents.length === 0 ? (
+                        <p className="text-center text-muted-foreground py-4">
+                          No users found
+                        </p>
+                      ) : (
+                        otherStudents.map((student) => (
+                          <button
+                            key={student.id}
+                            onClick={() => handleStartChat(student)}
+                            disabled={startDirectChatMutation.isPending}
+                            className="w-full p-3 rounded-lg text-left hover-elevate flex items-center gap-3"
+                            data-testid={`user-${student.id}`}
+                          >
+                            <Avatar className="h-10 w-10">
+                              <AvatarFallback>{student.name[0]}</AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-sm truncate">{student.name}</h3>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {student.major} - {student.year}
+                              </p>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
@@ -171,7 +278,9 @@ export default function Chat() {
               </div>
             ) : filteredRooms.length === 0 ? (
               <div className="p-4 text-center text-muted-foreground">
-                No chat rooms found
+                <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                <p className="text-sm">No chats yet</p>
+                <p className="text-xs mt-1">Click + to start a conversation</p>
               </div>
             ) : (
               filteredRooms.map((room) => (
@@ -185,11 +294,11 @@ export default function Chat() {
                 >
                   <div className="flex items-start gap-3">
                     <Avatar className="h-10 w-10">
-                      <AvatarFallback>{room.name[0]}</AvatarFallback>
+                      <AvatarFallback>{getRoomDisplayName(room)[0]}</AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 mb-1">
-                        <h3 className="font-semibold text-sm truncate">{room.name}</h3>
+                        <h3 className="font-semibold text-sm truncate">{getRoomDisplayName(room)}</h3>
                         {room.lastMessageTime && (
                           <span className="text-xs text-muted-foreground shrink-0">
                             {format(new Date(room.lastMessageTime), "h:mm a")}
@@ -200,6 +309,11 @@ export default function Chat() {
                         <p className="text-sm text-muted-foreground truncate">
                           {room.lastMessage || "No messages yet"}
                         </p>
+                        {room.type !== "direct" && (
+                          <Badge variant="secondary" className="text-xs shrink-0">
+                            {room.type}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -216,14 +330,14 @@ export default function Chat() {
             <div className="p-4 border-b bg-card">
               <div className="flex items-center gap-3">
                 <Avatar className="h-10 w-10">
-                  <AvatarFallback>{selectedRoom.name[0]}</AvatarFallback>
+                  <AvatarFallback>{getRoomDisplayName(selectedRoom)[0]}</AvatarFallback>
                 </Avatar>
                 <div>
                   <h2 className="font-semibold" data-testid="text-chat-room-name">
-                    {selectedRoom.name}
+                    {getRoomDisplayName(selectedRoom)}
                   </h2>
                   <p className="text-sm text-muted-foreground capitalize">
-                    {selectedRoom.type} chat
+                    {selectedRoom.type === "direct" ? "Direct message" : `${selectedRoom.type} chat`}
                   </p>
                 </div>
               </div>
@@ -306,7 +420,7 @@ export default function Chat() {
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center text-muted-foreground">
               <MessageCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>Select a chat to start messaging</p>
+              <p>Select a chat or start a new conversation</p>
             </div>
           </div>
         )}
