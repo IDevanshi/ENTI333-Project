@@ -4,10 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EventCard } from "@/components/event-card";
+import { EventDetailDialog } from "@/components/event-detail-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Search, Calendar } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useForm } from "react-hook-form";
@@ -35,6 +35,8 @@ export default function Events() {
   const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<Event | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
   const form = useForm<EventFormData>({
     resolver: zodResolver(eventFormSchema),
@@ -171,6 +173,7 @@ export default function Events() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Create New Event</DialogTitle>
+              <DialogDescription>Fill in the details to create a new campus event.</DialogDescription>
             </DialogHeader>
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -309,7 +312,11 @@ export default function Events() {
                   key={event.id}
                   event={event}
                   isAttending={isAttending(event)}
-                  onRSVP={() => handleRSVP(event.id, isAttending(event))}
+                  onRSVP={user?.student ? () => handleRSVP(event.id, isAttending(event)) : undefined}
+                  onClick={() => {
+                    setSelectedEvent(event);
+                    setDetailDialogOpen(true);
+                  }}
                 />
               ))}
             </div>
@@ -340,7 +347,11 @@ export default function Events() {
                     key={event.id}
                     event={event}
                     isAttending={true}
-                    onRSVP={() => handleRSVP(event.id, true)}
+                    onRSVP={user?.student ? () => handleRSVP(event.id, true) : undefined}
+                    onClick={() => {
+                      setSelectedEvent(event);
+                      setDetailDialogOpen(true);
+                    }}
                   />
                 ))}
             </div>
@@ -351,6 +362,15 @@ export default function Events() {
           )}
         </TabsContent>
       </Tabs>
+
+      <EventDetailDialog
+        event={selectedEvent}
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+        onRSVP={selectedEvent ? () => handleRSVP(selectedEvent.id, isAttending(selectedEvent)) : undefined}
+        isAttending={selectedEvent ? isAttending(selectedEvent) : false}
+        isLoggedIn={!!user?.student}
+      />
     </div>
   );
 }
