@@ -1,11 +1,13 @@
 import { createContext, useContext } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest, getQueryFn } from "./queryClient";
-import type { User, Student } from "@shared/schema";
+import type { Student } from "@shared/schema";
 
 interface AuthUser {
   id: string;
   username: string;
+  email: string;
+  emailVerified: boolean;
   student: Student | null;
 }
 
@@ -13,9 +15,11 @@ interface AuthContextType {
   user: AuthUser | null;
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string) => Promise<void>;
+  register: (username: string, password: string, email: string) => Promise<{ requiresVerification?: boolean }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  verifyEmail: (code: string) => Promise<void>;
+  resendVerification: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -39,12 +43,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   });
 
   const registerMutation = useMutation({
-    mutationFn: async ({ username, password }: { username: string; password: string }) => {
-      const response = await apiRequest("POST", "/api/auth/register", { username, password });
+    mutationFn: async ({ username, password, email }: { username: string; password: string; email: string }) => {
+      const response = await apiRequest("POST", "/api/auth/register", { username, password, email });
       return await response.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    },
+  });
+
+  const verifyEmailMutation = useMutation({
+    mutationFn: async ({ code }: { code: string }) => {
+      const response = await apiRequest("POST", "/api/auth/verify-email", { code });
+      return await response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+    },
+  });
+
+  const resendVerificationMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/auth/resend-verification");
+      return await response.json();
     },
   });
 
@@ -62,8 +83,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await loginMutation.mutateAsync({ username, password });
   };
 
-  const register = async (username: string, password: string) => {
-    await registerMutation.mutateAsync({ username, password });
+  const register = async (username: string, password: string, email: string) => {
+    const result = await registerMutation.mutateAsync({ username, password, email });
+    return { requiresVerification: result.requiresVerification };
   };
 
   const logout = async () => {
@@ -74,8 +96,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
   };
 
+  const verifyEmail = async (code: string) => {
+    await verifyEmailMutation.mutateAsync({ code });
+  };
+
+  const resendVerification = async () => {
+    await resendVerificationMutation.mutateAsync();
+  };
+
   return (
-    <AuthContext.Provider value={{ user: user ?? null, isLoading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ 
+      user: user ?? null, 
+      isLoading, 
+      login, 
+      register, 
+      logout, 
+      refreshUser,
+      verifyEmail,
+      resendVerification
+    }}>
       {children}
     </AuthContext.Provider>
   );
