@@ -31,14 +31,7 @@ export default function Chat() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const { data: chatRooms = [], isLoading: roomsLoading } = useQuery<ChatRoom[]>({
-    queryKey: ["/api/chat-rooms", user?.student?.id],
-    queryFn: async () => {
-      const res = await fetch(`/api/chat-rooms?studentId=${user?.student?.id}`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to fetch chat rooms");
-      return res.json();
-    },
+    queryKey: ["/api/my-chat-rooms"],
     enabled: !!user?.student?.id,
   });
 
@@ -133,7 +126,7 @@ export default function Chat() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/messages", selectedRoomId] });
-      queryClient.invalidateQueries({ queryKey: ["/api/chat-rooms", user?.student?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-chat-rooms"] });
     },
   });
 
@@ -153,7 +146,7 @@ export default function Chat() {
     },
     onSuccess: (room: ChatRoom | undefined) => {
       if (!room) return;
-      queryClient.invalidateQueries({ queryKey: ["/api/chat-rooms", user?.student?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/my-chat-rooms"] });
       setSelectedRoomId(room.id);
       setNewChatDialogOpen(false);
       setUserSearchQuery("");

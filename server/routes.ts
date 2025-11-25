@@ -450,6 +450,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get chat rooms for the current authenticated user
+  app.get("/api/my-chat-rooms", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+      const student = await storage.getStudentByUserId(req.session.userId);
+      if (!student) {
+        return res.json([]);
+      }
+      const rooms = await storage.getChatRoomsByStudent(student.id);
+      res.json(rooms);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch chat rooms" });
+    }
+  });
+
   app.get("/api/chat-rooms/:id", async (req, res) => {
     try {
       const room = await storage.getChatRoom(req.params.id);
