@@ -1,5 +1,6 @@
 import { Home, Users, Calendar, GraduationCap, MessageSquare, Newspaper, MapPin, LogIn, LogOut, UserPlus } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import {
   Sidebar,
   SidebarContent,
@@ -14,6 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const menuItems = [
   {
@@ -64,6 +66,15 @@ export function AppSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
 
+  const { data: unreadData } = useQuery<{ unreadCount: number }>({
+    queryKey: ["/api/messages/unread", user?.student?.id],
+    enabled: !!user?.student?.id,
+    refetchInterval: 10000,
+  });
+
+  const unreadCount = unreadData?.unreadCount || 0;
+  const displayCount = unreadCount > 9 ? "9+" : unreadCount.toString();
+
   return (
     <Sidebar>
       <SidebarHeader className="p-6">
@@ -92,6 +103,15 @@ export function AppSidebar() {
                     <Link href={item.url}>
                       <item.icon className="h-5 w-5" />
                       <span>{item.title}</span>
+                      {item.title === "Chat" && unreadCount > 0 && (
+                        <Badge 
+                          variant="destructive" 
+                          className="ml-auto h-5 min-w-5 px-1.5 text-xs"
+                          data-testid="badge-unread-messages"
+                        >
+                          {displayCount}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

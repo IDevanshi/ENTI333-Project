@@ -46,8 +46,12 @@ export interface IStorage {
   deleteStudent(id: string): Promise<boolean>;
 
   // Match methods
+  getMatch(id: string): Promise<Match | undefined>;
   getMatches(studentId: string): Promise<Match[]>;
+  getAcceptedMatches(studentId: string): Promise<Match[]>;
+  getPendingMatchesForStudent(studentId: string): Promise<Match[]>;
   createMatch(match: InsertMatch): Promise<Match>;
+  updateMatch(id: string, updates: Partial<InsertMatch>): Promise<Match | undefined>;
   deleteMatch(id: string): Promise<boolean>;
 
   // Event methods
@@ -159,6 +163,11 @@ export class DatabaseStorage implements IStorage {
   }
 
   // Match methods
+  async getMatch(id: string): Promise<Match | undefined> {
+    const [match] = await db.select().from(matches).where(eq(matches.id, id));
+    return match || undefined;
+  }
+
   async getMatches(studentId: string): Promise<Match[]> {
     return await db
       .select()
@@ -166,9 +175,42 @@ export class DatabaseStorage implements IStorage {
       .where(or(eq(matches.student1Id, studentId), eq(matches.student2Id, studentId)));
   }
 
+  async getAcceptedMatches(studentId: string): Promise<Match[]> {
+    return await db
+      .select()
+      .from(matches)
+      .where(
+        and(
+          or(eq(matches.student1Id, studentId), eq(matches.student2Id, studentId)),
+          eq(matches.status, "accepted")
+        )
+      );
+  }
+
+  async getPendingMatchesForStudent(studentId: string): Promise<Match[]> {
+    return await db
+      .select()
+      .from(matches)
+      .where(
+        and(
+          eq(matches.student2Id, studentId),
+          eq(matches.status, "pending")
+        )
+      );
+  }
+
   async createMatch(insertMatch: InsertMatch): Promise<Match> {
     const [match] = await db.insert(matches).values(insertMatch).returning();
     return match;
+  }
+
+  async updateMatch(id: string, updates: Partial<InsertMatch>): Promise<Match | undefined> {
+    const [updated] = await db
+      .update(matches)
+      .set(updates)
+      .where(eq(matches.id, id))
+      .returning();
+    return updated || undefined;
   }
 
   async deleteMatch(id: string): Promise<boolean> {

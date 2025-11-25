@@ -266,6 +266,60 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/matches/:studentId/accepted", async (req, res) => {
+    try {
+      const matches = await storage.getAcceptedMatches(req.params.studentId);
+      res.json(matches);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch accepted matches" });
+    }
+  });
+
+  app.get("/api/matches/:studentId/pending", async (req, res) => {
+    try {
+      const matches = await storage.getPendingMatchesForStudent(req.params.studentId);
+      res.json(matches);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch pending matches" });
+    }
+  });
+
+  app.put("/api/matches/:id/accept", async (req, res) => {
+    try {
+      const match = await storage.updateMatch(req.params.id, { status: "accepted" });
+      if (!match) {
+        return res.status(404).json({ error: "Match not found" });
+      }
+      res.json(match);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to accept match" });
+    }
+  });
+
+  app.put("/api/matches/:id/decline", async (req, res) => {
+    try {
+      const match = await storage.updateMatch(req.params.id, { status: "declined" });
+      if (!match) {
+        return res.status(404).json({ error: "Match not found" });
+      }
+      res.json(match);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to decline match" });
+    }
+  });
+
+  app.delete("/api/matches/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteMatch(req.params.id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Match not found" });
+      }
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete match" });
+    }
+  });
+
   // Event Routes
   app.get("/api/events", async (_req, res) => {
     try {
@@ -610,6 +664,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(message);
     } catch (error) {
       res.status(400).json({ error: "Invalid message data" });
+    }
+  });
+
+  app.get("/api/messages/unread/:studentId", async (req, res) => {
+    try {
+      const studentId = req.params.studentId;
+      const chatRooms = await storage.getChatRoomsByStudent(studentId);
+      
+      let totalUnread = 0;
+      for (const room of chatRooms) {
+        const messages = await storage.getMessagesByRoom(room.id);
+        const unreadInRoom = messages.filter(m => m.senderId !== studentId).length;
+        const sentByUser = messages.filter(m => m.senderId === studentId).length;
+        if (sentByUser === 0 && unreadInRoom > 0) {
+          totalUnread += unreadInRoom;
+        } else {
+          const lastUserMessageIndex = messages.map(m => m.senderId).lastIndexOf(studentId);
+          const messagesAfter = messages.slice(lastUserMessageIndex + 1).filter(m => m.senderId !== studentId);
+          totalUnread += messagesAfter.length;
+        }
+      }
+      
+      res.json({ unreadCount: totalUnread });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch unread count" });
     }
   });
 
