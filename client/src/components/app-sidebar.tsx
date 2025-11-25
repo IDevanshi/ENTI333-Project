@@ -124,10 +124,15 @@ export function AppSidebar() {
         {user ? (
           <div className="space-y-2">
             {user.student && (
-              <div className="px-2 py-1">
-                <p className="text-sm font-medium">{user.student.name}</p>
-                <p className="text-xs text-muted-foreground">{user.username}</p>
-              </div>
+              <Link href="/profile">
+                <div 
+                  className="px-2 py-2 rounded-md cursor-pointer hover-elevate"
+                  data-testid="link-profile"
+                >
+                  <p className="text-sm font-medium">{user.student.name}</p>
+                  <p className="text-xs text-muted-foreground">@{user.username}</p>
+                </div>
+              </Link>
             )}
             <Button
               variant="outline"
