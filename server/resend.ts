@@ -50,8 +50,12 @@ export async function sendVerificationEmail(toEmail: string, verificationCode: s
   try {
     const { client, fromEmail } = await getUncachableResendClient();
     
+    // Always use a verified sender domain - Resend's test domain for development
+    // The user's email domain (e.g., gmail.com) cannot be used as a sender
+    const senderEmail = 'CampusConnect <onboarding@resend.dev>';
+    
     const result = await client.emails.send({
-      from: fromEmail || 'CampusConnect <onboarding@resend.dev>',
+      from: senderEmail,
       to: toEmail,
       subject: 'Verify your CampusConnect account',
       html: `

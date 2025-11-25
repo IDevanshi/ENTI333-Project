@@ -283,6 +283,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "Not authenticated" });
       }
 
+      // Enforce email verification before allowing profile creation
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      if (!user.emailVerified) {
+        return res.status(403).json({ error: "Please verify your email before creating a profile" });
+      }
+
       const existingStudent = await storage.getStudentByUserId(req.session.userId);
       if (existingStudent) {
         return res.status(400).json({ error: "Profile already exists" });
