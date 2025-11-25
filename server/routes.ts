@@ -1,8 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import bcrypt from "bcryptjs";
 import { storage } from "./storage";
 import {
+  insertUserSchema,
   insertStudentSchema,
   insertMatchSchema,
   insertEventSchema,
@@ -16,6 +18,96 @@ import {
 
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
+
+  // Authentication Routes
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const { username, password } = insertUserSchema.parse(req.body);
+      
+      const existingUser = await storage.getUserByUsername(username);
+      if (existingUser) {
+        return res.status(400).json({ error: "Username already exists" });
+      }
+
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const user = await storage.createUser({
+        username,
+        password: hashedPassword,
+      });
+
+      req.session.userId = user.id;
+      res.status(201).json({ id: user.id, username: user.username });
+    } catch (error) {
+      res.status(400).json({ error: "Invalid registration data" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: "Username and password required" });
+      }
+
+      const user = await storage.getUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      const validPassword = await bcrypt.compare(password, user.password);
+      if (!validPassword) {
+        return res.status(401).json({ error: "Invalid credentials" });
+      }
+
+      const student = await storage.getStudentByUserId(user.id);
+      
+      req.session.userId = user.id;
+      if (student) {
+        req.session.studentId = student.id;
+      }
+
+      res.json({
+        id: user.id,
+        username: user.username,
+        student: student || null,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Login failed" });
+    }
+  });
+
+  app.post("/api/auth/logout", (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        return res.status(500).json({ error: "Logout failed" });
+      }
+      res.json({ message: "Logged out successfully" });
+    });
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    if (!req.session.userId) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    try {
+      const user = await storage.getUser(req.session.userId);
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
+      }
+
+      const student = await storage.getStudentByUserId(user.id);
+      
+      res.json({
+        id: user.id,
+        username: user.username,
+        student: student || null,
+      });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch user" });
+    }
+  });
 
   // Student Profile Routes
   app.get("/api/students", async (_req, res) => {
@@ -41,8 +133,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/students", async (req, res) => {
     try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "Not authenticated" });
+      }
+
+      const existingStudent = await storage.getStudentByUserId(req.session.userId);
+      if (existingStudent) {
+        return res.status(400).json({ error: "Profile already exists" });
+      }
+
       const validatedData = insertStudentSchema.parse(req.body);
-      const student = await storage.createStudent(validatedData);
+      const student = await storage.createStudent({
+        ...validatedData,
+        userId: req.session.userId,
+      });
+
+      req.session.studentId = student.id;
       res.status(201).json(student);
     } catch (error) {
       res.status(400).json({ error: "Invalid student data" });
@@ -378,6 +484,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Direct chat endpoint - creates or gets existing direct chat between two users
+  app.post("/api/chat-rooms/direct", async (req, res) => {
+    try {
+      const { student1Id, student2Id, student1Name, student2Name } = req.body;
+      
+      if (!student1Id || !student2Id || !student1Name || !student2Name) {
+        return res.status(400).json({ error: "Both student IDs and names are required" });
+      }
+      
+      // Check if direct chat already exists
+      let room = await storage.getDirectChatRoom(student1Id, student2Id);
+      
+      if (!room) {
+        // Create new direct chat room
+        room = await storage.createChatRoom({
+          name: `${student1Name} & ${student2Name}`,
+          type: "direct",
+          members: [student1Id, student2Id],
+        });
+      }
+      
+      res.json(room);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create direct chat" });
+    }
+  });
+
   // Message Routes
   app.get("/api/messages/:roomId", async (req, res) => {
     try {
@@ -529,18 +662,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       try {
         const message = JSON.parse(data.toString());
 
-        if (message.type === "join") {
+        if (message.type === "join" && message.roomId) {
           // Join a chat room
-          currentRoom = message.roomId;
-          if (!roomConnections.has(currentRoom)) {
-            roomConnections.set(currentRoom, new Set());
+          const roomId: string = message.roomId;
+          currentRoom = roomId;
+          if (!roomConnections.has(roomId)) {
+            roomConnections.set(roomId, new Set());
           }
-          roomConnections.get(currentRoom)?.add(ws);
+          roomConnections.get(roomId)?.add(ws);
           
           // Send acknowledgment
           ws.send(JSON.stringify({
             type: "joined",
-            roomId: currentRoom,
+            roomId: roomId,
           }));
         } else if (message.type === "message" && currentRoom) {
           // Validate and save message
