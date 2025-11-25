@@ -10,14 +10,19 @@ interface EventCardProps {
   event: Event;
   onRSVP?: () => void;
   isAttending?: boolean;
+  onClick?: () => void;
 }
 
-export function EventCard({ event, onRSVP, isAttending }: EventCardProps) {
+export function EventCard({ event, onRSVP, isAttending, onClick }: EventCardProps) {
   const eventDate = new Date(event.date);
   const attendeeCount = event.attendees.length;
 
   return (
-    <Card className="overflow-hidden hover-elevate" data-testid={`card-event-${event.id}`}>
+    <Card 
+      className="overflow-hidden hover-elevate cursor-pointer" 
+      data-testid={`card-event-${event.id}`}
+      onClick={onClick}
+    >
       <div className="relative aspect-video">
         {event.image ? (
           <img
@@ -87,7 +92,10 @@ export function EventCard({ event, onRSVP, isAttending }: EventCardProps) {
           <Button
             className="w-full"
             variant={isAttending ? "outline" : "default"}
-            onClick={onRSVP}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRSVP();
+            }}
             data-testid={`button-rsvp-${event.id}`}
           >
             {isAttending ? "Cancel RSVP" : "RSVP"}

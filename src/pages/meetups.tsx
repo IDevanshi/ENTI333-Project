@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Coffee, Book, Dumbbell, Utensils } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MeetupDetailDialog } from "@/components/meetup-detail-dialog";
 
 // Mock meetup locations
 const mockLocations = [
@@ -63,6 +65,15 @@ const mockLocations = [
   },
 ];
 
+interface MeetupLocation {
+  id: string;
+  name: string;
+  type: string;
+  description: string;
+  address: string;
+  popular: boolean;
+}
+
 const typeIcons = {
   study: Book,
   café: Coffee,
@@ -71,6 +82,14 @@ const typeIcons = {
 };
 
 export default function Meetups() {
+  const [selectedLocation, setSelectedLocation] = useState<MeetupLocation | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+
+  const handleLocationClick = (location: MeetupLocation) => {
+    setSelectedLocation(location);
+    setDetailDialogOpen(true);
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div>
@@ -96,8 +115,9 @@ export default function Meetups() {
               return (
                 <Card
                   key={location.id}
-                  className="p-6 hover-elevate"
+                  className="p-6 hover-elevate cursor-pointer"
                   data-testid={`card-location-${location.id}`}
+                  onClick={() => handleLocationClick(location)}
                 >
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-2">
@@ -144,7 +164,11 @@ export default function Meetups() {
               .map((location) => {
                 const Icon = typeIcons[location.type as keyof typeof typeIcons];
                 return (
-                  <Card key={location.id} className="p-6 hover-elevate">
+                  <Card 
+                    key={location.id} 
+                    className="p-6 hover-elevate cursor-pointer"
+                    onClick={() => handleLocationClick(location)}
+                  >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
@@ -182,7 +206,11 @@ export default function Meetups() {
                 .map((location) => {
                   const Icon = typeIcons[location.type as keyof typeof typeIcons];
                   return (
-                    <Card key={location.id} className="p-6 hover-elevate">
+                    <Card 
+                      key={location.id} 
+                      className="p-6 hover-elevate cursor-pointer"
+                      onClick={() => handleLocationClick(location)}
+                    >
                       <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-2">
                           <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center">
@@ -210,6 +238,12 @@ export default function Meetups() {
           </TabsContent>
         ))}
       </Tabs>
+
+      <MeetupDetailDialog
+        location={selectedLocation}
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+      />
     </div>
   );
 }

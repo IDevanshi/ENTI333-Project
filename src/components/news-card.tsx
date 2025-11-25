@@ -6,13 +6,18 @@ import type { CampusNews } from "@shared/schema";
 
 interface NewsCardProps {
   news: CampusNews;
+  onClick?: () => void;
 }
 
-export function NewsCard({ news }: NewsCardProps) {
+export function NewsCard({ news, onClick }: NewsCardProps) {
   const newsDate = new Date(news.createdAt);
 
   return (
-    <Card className="overflow-hidden hover-elevate" data-testid={`card-news-${news.id}`}>
+    <Card 
+      className="overflow-hidden hover-elevate cursor-pointer" 
+      data-testid={`card-news-${news.id}`}
+      onClick={onClick}
+    >
       {news.image && (
         <div className="relative aspect-[4/3]">
           <img

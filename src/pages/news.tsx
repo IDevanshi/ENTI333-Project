@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { NewsCard } from "@/components/news-card";
+import { NewsDetailDialog } from "@/components/news-detail-dialog";
 import { Search } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { CampusNews } from "@shared/schema";
 import socialImage from "@assets/generated_images/campus_social_event_outdoors.png";
 import studyImage from "@assets/generated_images/study_group_in_library.png";
 
 // Mock news data
-const mockNews = [
+const mockNews: CampusNews[] = [
   {
     id: "1",
     title: "Spring Registration Opens Next Week",
@@ -49,6 +51,8 @@ const mockNews = [
 export default function News() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
+  const [selectedNews, setSelectedNews] = useState<CampusNews | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
 
   const filteredNews = mockNews.filter((news) => {
     const matchesSearch =
@@ -92,7 +96,14 @@ export default function News() {
           {filteredNews.length > 0 ? (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredNews.map((news) => (
-                <NewsCard key={news.id} news={news} />
+                <NewsCard 
+                  key={news.id} 
+                  news={news}
+                  onClick={() => {
+                    setSelectedNews(news);
+                    setDetailDialogOpen(true);
+                  }}
+                />
               ))}
             </div>
           ) : searchQuery ? (
@@ -106,6 +117,12 @@ export default function News() {
           )}
         </TabsContent>
       </Tabs>
+
+      <NewsDetailDialog
+        news={selectedNews}
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
+      />
     </div>
   );
 }
