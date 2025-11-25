@@ -664,16 +664,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         if (message.type === "join" && message.roomId) {
           // Join a chat room
-          currentRoom = message.roomId;
-          if (!roomConnections.has(currentRoom)) {
-            roomConnections.set(currentRoom, new Set());
+          const roomId: string = message.roomId;
+          currentRoom = roomId;
+          if (!roomConnections.has(roomId)) {
+            roomConnections.set(roomId, new Set());
           }
-          roomConnections.get(currentRoom)?.add(ws);
+          roomConnections.get(roomId)?.add(ws);
           
           // Send acknowledgment
           ws.send(JSON.stringify({
             type: "joined",
-            roomId: currentRoom,
+            roomId: roomId,
           }));
         } else if (message.type === "message" && currentRoom) {
           // Validate and save message
