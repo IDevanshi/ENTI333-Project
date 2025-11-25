@@ -40,7 +40,8 @@ export default function Discover() {
       const response = await apiRequest("POST", "/api/matches", {
         student1Id,
         student2Id,
-        matchScore: score,
+        compatibilityScore: score,
+        status: "accepted",
       });
       return { data: await response.json(), studentName };
     },

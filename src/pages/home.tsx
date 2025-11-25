@@ -3,8 +3,10 @@ import { Card } from "@/components/ui/card";
 import { Users, Calendar, GraduationCap, MessageSquare, Heart, Sparkles } from "lucide-react";
 import { Link } from "wouter";
 import heroImage from "@assets/generated_images/campus_students_collaborating_together.png";
+import { useAuth } from "@/lib/auth";
 
 export default function Home() {
+  const { user } = useAuth();
   const features = [
     {
       icon: Users,
@@ -57,26 +59,41 @@ export default function Home() {
           </p>
           
           <div className="flex flex-wrap gap-4 justify-center">
-            <Link href="/profile-setup">
-              <Button
-                size="lg"
-                className="text-lg px-8 bg-primary/90 backdrop-blur-md hover:bg-primary border border-primary-border"
-                data-testid="button-get-started"
-              >
-                <Heart className="mr-2 h-5 w-5" />
-                Get Started
-              </Button>
-            </Link>
-            <Link href="/discover">
-              <Button
-                size="lg"
-                variant="outline"
-                className="text-lg px-8 bg-white/10 backdrop-blur-md border-white/30 text-white hover:bg-white/20"
-                data-testid="button-discover"
-              >
-                Discover Matches
-              </Button>
-            </Link>
+            {!user ? (
+              <>
+                <Link href="/register">
+                  <Button
+                    size="lg"
+                    className="text-lg px-8 bg-primary/90 backdrop-blur-md hover:bg-primary border border-primary-border"
+                    data-testid="button-get-started"
+                  >
+                    <Heart className="mr-2 h-5 w-5" />
+                    Get Started
+                  </Button>
+                </Link>
+                <Link href="/login">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="text-lg px-8 bg-white/10 backdrop-blur-md border-white/30 text-white hover:bg-white/20"
+                    data-testid="button-login-home"
+                  >
+                    Sign In
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <Link href="/discover">
+                <Button
+                  size="lg"
+                  className="text-lg px-8 bg-primary/90 backdrop-blur-md hover:bg-primary border border-primary-border"
+                  data-testid="button-discover"
+                >
+                  <Users className="mr-2 h-5 w-5" />
+                  Discover Matches
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
       </section>
@@ -105,19 +122,21 @@ export default function Home() {
       </section>
 
       {/* CTA Section */}
-      <section className="py-16 px-4 bg-muted/50">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-4">Ready to Find Your People?</h2>
-          <p className="text-lg text-muted-foreground mb-8">
-            Join thousands of students building meaningful connections on campus
-          </p>
-          <Link href="/profile-setup">
-            <Button size="lg" className="text-lg px-8" data-testid="button-create-profile">
-              Create Your Profile
-            </Button>
-          </Link>
-        </div>
-      </section>
+      {!user && (
+        <section className="py-16 px-4 bg-muted/50">
+          <div className="max-w-4xl mx-auto text-center">
+            <h2 className="text-3xl font-bold mb-4">Ready to Find Your People?</h2>
+            <p className="text-lg text-muted-foreground mb-8">
+              Join thousands of students building meaningful connections on campus
+            </p>
+            <Link href="/register">
+              <Button size="lg" className="text-lg px-8" data-testid="button-create-profile">
+                Create Your Profile
+              </Button>
+            </Link>
+          </div>
+        </section>
+      )}
     </div>
   );
 }
