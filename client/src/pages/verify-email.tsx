@@ -17,6 +17,18 @@ export default function VerifyEmail() {
   const [isResending, setIsResending] = useState(false);
   const [verified, setVerified] = useState(false);
 
+  // Redirect if not logged in
+  if (!user) {
+    setLocation("/login");
+    return null;
+  }
+
+  // Redirect if already verified
+  if (user.emailVerified && !verified) {
+    setLocation("/profile-setup");
+    return null;
+  }
+
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!code.trim() || code.length !== 6) {
