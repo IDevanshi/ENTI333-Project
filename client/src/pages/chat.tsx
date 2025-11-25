@@ -4,12 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Send, Search, MessageCircle, Plus, Users } from "lucide-react";
+import { Send, Search, MessageCircle, Plus, Users, User } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
+import { useLocation } from "wouter";
 import {
   Dialog,
   DialogContent,
@@ -21,6 +22,7 @@ import type { ChatRoom, Message, Student } from "@shared/schema";
 
 export default function Chat() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
   const [messageInput, setMessageInput] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
@@ -171,6 +173,12 @@ export default function Chat() {
       return names.find(n => n !== user.student?.name) || room.name;
     }
     return room.name;
+  };
+
+  const getOtherStudentId = (room: ChatRoom): string | null => {
+    if (room.type !== "direct" || !user?.student?.id) return null;
+    const otherMember = room.members?.find(id => id !== user.student?.id);
+    return otherMember || null;
   };
 
   if (!user) {
@@ -331,18 +339,34 @@ export default function Chat() {
         {selectedRoom ? (
           <>
             <div className="p-4 border-b bg-card">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback>{getRoomDisplayName(selectedRoom)[0]}</AvatarFallback>
-                </Avatar>
-                <div>
-                  <h2 className="font-semibold" data-testid="text-chat-room-name">
-                    {getRoomDisplayName(selectedRoom)}
-                  </h2>
-                  <p className="text-sm text-muted-foreground capitalize">
-                    {selectedRoom.type === "direct" ? "Direct message" : `${selectedRoom.type} chat`}
-                  </p>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback>{getRoomDisplayName(selectedRoom)[0]}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h2 className="font-semibold" data-testid="text-chat-room-name">
+                      {getRoomDisplayName(selectedRoom)}
+                    </h2>
+                    <p className="text-sm text-muted-foreground capitalize">
+                      {selectedRoom.type === "direct" ? "Direct message" : `${selectedRoom.type} chat`}
+                    </p>
+                  </div>
                 </div>
+                {selectedRoom.type === "direct" && getOtherStudentId(selectedRoom) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const otherId = getOtherStudentId(selectedRoom);
+                      if (otherId) setLocation(`/student/${otherId}`);
+                    }}
+                    data-testid="button-view-profile"
+                  >
+                    <User className="h-4 w-4 mr-2" />
+                    View Profile
+                  </Button>
+                )}
               </div>
             </div>
 

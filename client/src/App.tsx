@@ -14,6 +14,7 @@ import Login from "@/pages/login";
 import Register from "@/pages/register";
 import ProfileSetup from "@/pages/profile-setup";
 import Profile from "@/pages/profile";
+import StudentProfile from "@/pages/student-profile";
 import Discover from "@/pages/discover";
 import Events from "@/pages/events";
 import StudyGroups from "@/pages/study-groups";
@@ -48,6 +49,7 @@ function Router() {
       <Route path="/register" component={Register} />
       <Route path="/profile-setup" component={ProfileSetup} />
       <Route path="/profile" component={Profile} />
+      <Route path="/student/:id" component={StudentProfile} />
       <Route path="/discover" component={Discover} />
       <Route path="/events" component={Events} />
       <Route path="/groups" component={StudyGroups} />

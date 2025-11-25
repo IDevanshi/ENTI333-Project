@@ -68,6 +68,11 @@ export function AppSidebar() {
 
   const { data: unreadData } = useQuery<{ unreadCount: number }>({
     queryKey: ["/api/messages/unread", user?.student?.id],
+    queryFn: async () => {
+      if (!user?.student?.id) return { unreadCount: 0 };
+      const response = await fetch(`/api/messages/unread/${user.student.id}`);
+      return await response.json();
+    },
     enabled: !!user?.student?.id,
     refetchInterval: 10000,
   });
