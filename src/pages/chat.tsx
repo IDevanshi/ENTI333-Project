@@ -70,6 +70,13 @@ export default function Chat() {
     s.name.toLowerCase().includes(userSearchQuery.toLowerCase())
   );
 
+  // Mark chat as visited when user opens this page
+  useEffect(() => {
+    if (user?.student?.id) {
+      localStorage.setItem(`lastChatVisit_${user.student.id}`, Date.now().toString());
+    }
+  }, [user?.student?.id]);
+
   useEffect(() => {
     if (chatRooms.length > 0 && !selectedRoomId) {
       setSelectedRoomId(chatRooms[0].id);

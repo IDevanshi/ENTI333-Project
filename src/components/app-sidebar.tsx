@@ -1,5 +1,6 @@
 import { Home, Users, Calendar, GraduationCap, MessageSquare, Newspaper, MapPin, LogIn, LogOut, UserPlus } from "lucide-react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import {
   Sidebar,
   SidebarContent,
@@ -12,8 +13,10 @@ import {
   SidebarHeader,
   SidebarFooter,
 } from "@/components/ui/sidebar";
+import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import type { ChatRoom } from "@shared/schema";
 
 const menuItems = [
   {
@@ -64,6 +67,29 @@ export function AppSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
 
+  // Fetch chat rooms to calculate unread messages
+  const { data: chatRooms = [] } = useQuery<ChatRoom[]>({
+    queryKey: ["/api/chat-rooms", user?.student?.id],
+    queryFn: async () => {
+      if (!user?.student?.id) return [];
+      const response = await fetch(`/api/chat-rooms?studentId=${user.student.id}`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!user?.student?.id,
+    refetchInterval: 5000, // Poll every 5 seconds for new messages
+  });
+
+  // Get the last time user visited chat page
+  const lastChatVisit = localStorage.getItem(`lastChatVisit_${user?.student?.id}`) || "0";
+  const lastVisitTime = new Date(parseInt(lastChatVisit));
+
+  // Count rooms with messages since last visit
+  const unreadCount = chatRooms.filter(room => 
+    room.lastMessageTime && 
+    new Date(room.lastMessageTime) > lastVisitTime
+  ).length;
+
   return (
     <Sidebar>
       <SidebarHeader className="p-6">
@@ -92,6 +118,14 @@ export function AppSidebar() {
                     <Link href={item.url}>
                       <item.icon className="h-5 w-5" />
                       <span>{item.title}</span>
+                      {item.title === "Chat" && unreadCount > 0 && (
+                        <Badge 
+                          variant="destructive" 
+                          className="ml-auto h-5 min-w-[20px] px-1 flex items-center justify-center text-xs"
+                        >
+                          {unreadCount}
+                        </Badge>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
