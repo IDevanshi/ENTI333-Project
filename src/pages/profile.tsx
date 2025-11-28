@@ -16,6 +16,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   User, 
   GraduationCap, 
@@ -44,6 +54,8 @@ export default function Profile() {
   const [editData, setEditData] = useState<Partial<Student>>({});
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [matchToRemove, setMatchToRemove] = useState<string | null>(null);
 
   const { data: connections = [], isLoading: connectionsLoading } = useQuery<Match[]>({
     queryKey: ["/api/matches", user?.student?.id],
@@ -54,6 +66,7 @@ export default function Profile() {
       return response.json();
     },
     enabled: !!user?.student?.id,
+    refetchOnMount: "always",
   });
 
   const { data: connectedStudents = [] } = useQuery<Student[]>({
@@ -101,6 +114,21 @@ export default function Profile() {
     },
     onError: () => {
       toast({ variant: "destructive", title: "Failed to update username" });
+    },
+  });
+
+  const removeConnectionMutation = useMutation({
+    mutationFn: async (matchId: string) => {
+      const response = await apiRequest("DELETE", `/api/matches/${matchId}`);
+      if (!response.ok) throw new Error("Failed to remove connection");
+      return null;
+    },
+    onSuccess: () => {
+      toast({ title: "Connection removed successfully" });
+      queryClient.invalidateQueries({ queryKey: ["/api/matches", user?.student?.id] });
+    },
+    onError: () => {
+      toast({ variant: "destructive", title: "Failed to remove connection" });
     },
   });
 
@@ -197,6 +225,20 @@ export default function Profile() {
   const handleViewProfile = (studentData: Student) => {
     setSelectedStudent(studentData);
     setProfileDialogOpen(true);
+  };
+
+  const handleRemoveConnection = (matchId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMatchToRemove(matchId);
+    setRemoveDialogOpen(true);
+  };
+
+  const confirmRemoveConnection = () => {
+    if (matchToRemove) {
+      removeConnectionMutation.mutate(matchToRemove);
+      setRemoveDialogOpen(false);
+      setMatchToRemove(null);
+    }
   };
 
   return (
@@ -510,6 +552,9 @@ export default function Profile() {
                   .map((n) => n[0])
                   .join("")
                   .toUpperCase();
+                const matchId = connections.find(m => 
+                  m.student1Id === connectedStudent.id || m.student2Id === connectedStudent.id
+                )?.id;
                 return (
                   <div
                     key={connectedStudent.id}
@@ -528,11 +573,24 @@ export default function Profile() {
                         </p>
                       </div>
                     </div>
-                    <Link href="/chat" onClick={(e) => e.stopPropagation()}>
-                      <Button size="icon" variant="ghost" data-testid={`button-chat-${connectedStudent.id}`}>
-                        <MessageSquare className="h-4 w-4" />
-                      </Button>
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link href="/chat" onClick={(e) => e.stopPropagation()}>
+                        <Button size="icon" variant="ghost" data-testid={`button-chat-${connectedStudent.id}`}>
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      {matchId && (
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          onClick={(e) => handleRemoveConnection(matchId, e)}
+                          data-testid={`button-remove-${connectedStudent.id}`}
+                          className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -546,6 +604,26 @@ export default function Profile() {
         open={profileDialogOpen}
         onOpenChange={setProfileDialogOpen}
       />
+
+      <AlertDialog open={removeDialogOpen} onOpenChange={setRemoveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove Connection</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to remove this connection? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmRemoveConnection}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remove
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
