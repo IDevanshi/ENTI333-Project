@@ -9,7 +9,7 @@ import { X, Heart, ChevronDown, ChevronUp, UserCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import type { Student } from "@shared/schema";
+import type { Student, Match } from "@shared/schema";
 
 interface MatchResult {
   student: Student;
@@ -23,14 +23,36 @@ export default function Discover() {
   const [expandedProfile, setExpandedProfile] = useState(false);
   const [connections, setConnections] = useState<string[]>([]);
 
+  // Fetch existing connections
+  const { data: existingConnections = [] } = useQuery<Match[]>({
+    queryKey: ["/api/matches", user?.student?.id],
+    queryFn: async () => {
+      if (!user?.student?.id) return [];
+      const response = await fetch(`/api/matches/${user.student.id}`);
+      if (!response.ok) return [];
+      return response.json();
+    },
+    enabled: !!user?.student?.id,
+  });
+
+  // Get list of connected student IDs
+  const connectedStudentIds = existingConnections.map(match => 
+    match.student1Id === user?.student?.id ? match.student2Id : match.student1Id
+  );
+
   const { data: matches, isLoading, error } = useQuery<MatchResult[]>({
-    queryKey: ["/api/matches/calculate", user?.student?.id],
+    queryKey: ["/api/matches/calculate", user?.student?.id, connectedStudentIds],
     queryFn: async () => {
       if (!user?.student?.id) return [];
       const response = await apiRequest("POST", "/api/matches/calculate", {
         studentId: user.student.id,
       });
-      return await response.json();
+      const allMatches = await response.json();
+      // Filter out students who are already connected
+      return allMatches.filter((match: MatchResult) => 
+        !connectedStudentIds.includes(match.student.id) && 
+        !connections.includes(match.student.id)
+      );
     },
     enabled: !!user?.student?.id,
   });

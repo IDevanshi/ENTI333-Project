@@ -17,6 +17,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { StudentProfileDialog } from "@/components/student-profile-dialog";
 import type { ChatRoom, Message, Student } from "@shared/schema";
 
 export default function Chat() {
@@ -27,6 +28,8 @@ export default function Chat() {
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [wsMessages, setWsMessages] = useState<Message[]>([]);
   const [newChatDialogOpen, setNewChatDialogOpen] = useState(false);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -66,6 +69,13 @@ export default function Chat() {
     s => s.id !== user?.student?.id && 
     s.name.toLowerCase().includes(userSearchQuery.toLowerCase())
   );
+
+  // Mark chat as visited when user opens this page
+  useEffect(() => {
+    if (user?.student?.id) {
+      localStorage.setItem(`lastChatVisit_${user.student.id}`, Date.now().toString());
+    }
+  }, [user?.student?.id]);
 
   useEffect(() => {
     if (chatRooms.length > 0 && !selectedRoomId) {
@@ -174,6 +184,18 @@ export default function Chat() {
       return names.find(n => n !== user.student?.name) || room.name;
     }
     return room.name;
+  };
+
+  const handleOpenProfile = async (senderId: string) => {
+    try {
+      const response = await fetch(`/api/students/${senderId}`);
+      if (!response.ok) return;
+      const student = await response.json();
+      setSelectedStudent(student);
+      setProfileDialogOpen(true);
+    } catch (error) {
+      console.error("Failed to fetch student profile:", error);
+    }
   };
 
   if (!user) {
@@ -369,7 +391,10 @@ export default function Chat() {
                         data-testid={`message-${message.id}`}
                       >
                         {!isMe && (
-                          <Avatar className="h-8 w-8">
+                          <Avatar 
+                            className="h-8 w-8 cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={() => handleOpenProfile(message.senderId)}
+                          >
                             <AvatarFallback className="text-xs">
                               {message.senderName[0]}
                             </AvatarFallback>
@@ -431,6 +456,12 @@ export default function Chat() {
           </div>
         )}
       </div>
+
+      <StudentProfileDialog
+        student={selectedStudent}
+        open={profileDialogOpen}
+        onOpenChange={setProfileDialogOpen}
+      />
     </div>
   );
 }
