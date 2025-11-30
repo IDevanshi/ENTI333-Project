@@ -46,6 +46,12 @@ export default function Chat() {
 
   const { data: roomMessages = [], isLoading: messagesLoading } = useQuery<Message[]>({
     queryKey: ["/api/messages", selectedRoomId],
+    queryFn: async () => {
+      if (!selectedRoomId) return [];
+      const response = await fetch(`/api/messages/${selectedRoomId}`);
+      if (!response.ok) throw new Error("Failed to fetch messages");
+      return response.json();
+    },
     enabled: !!selectedRoomId,
   });
 
@@ -57,9 +63,28 @@ export default function Chat() {
   const selectedRoom = chatRooms.find(r => r.id === selectedRoomId);
 
   const allMessages = [...roomMessages, ...wsMessages.filter(m => m.roomId === selectedRoomId)];
-  const uniqueMessages = allMessages.filter((msg, index, self) =>
-    index === self.findIndex(m => m.id === msg.id)
-  );
+  console.log("Chat Debug - roomMessages:", roomMessages);
+  console.log("Chat Debug - wsMessages:", wsMessages);
+  console.log("Chat Debug - allMessages:", allMessages);
+  
+  // Deduplicate messages, preferring real IDs over temp IDs
+  const uniqueMessages = allMessages.filter((msg, index, self) => {
+    // If this is a temp message, check if a real version exists
+    if (typeof msg.id === 'string' && msg.id.startsWith('temp-')) {
+      const hasRealVersion = self.some(m => 
+        !String(m.id).startsWith('temp-') && 
+        m.content === msg.content && 
+        m.senderId === msg.senderId &&
+        Math.abs(new Date(m.createdAt).getTime() - new Date(msg.createdAt).getTime()) < 5000
+      );
+      if (hasRealVersion) return false; // Skip temp version if real one exists
+    }
+    // Standard deduplication by ID
+    return index === self.findIndex(m => m.id === msg.id);
+  });
+  
+  console.log("Chat Debug - uniqueMessages:", uniqueMessages);
+  console.log("Chat Debug - selectedRoomId:", selectedRoomId);
 
   const filteredRooms = chatRooms.filter((room) =>
     room.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -94,15 +119,38 @@ export default function Chat() {
     const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
     wsRef.current = ws;
 
+    let heartbeatInterval: NodeJS.Timeout;
+
     ws.onopen = () => {
+      console.log("WebSocket connected");
       ws.send(JSON.stringify({ type: "join", roomId: selectedRoomId }));
+      
+      // Send heartbeat every 30 seconds to keep connection alive
+      heartbeatInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "ping" }));
+        }
+      }, 30000);
     };
 
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
+        console.log("WebSocket received:", data);
         if (data.type === "message" && data.data) {
-          setWsMessages(prev => [...prev, data.data]);
+          console.log("Adding message to wsMessages:", data.data);
+          setWsMessages(prev => {
+            // Prevent duplicates by checking if message already exists
+            const exists = prev.some(m => m.id === data.data.id);
+            if (exists) {
+              console.log("Message already exists, skipping");
+              return prev;
+            }
+            console.log("Adding new message, prev count:", prev.length);
+            const newMessages = [...prev, data.data];
+            console.log("New messages count:", newMessages.length);
+            return newMessages;
+          });
         }
       } catch (error) {
         console.error("WebSocket message error:", error);
@@ -113,13 +161,19 @@ export default function Chat() {
       console.error("WebSocket error:", error);
     };
 
+    ws.onclose = () => {
+      console.log("WebSocket disconnected");
+      clearInterval(heartbeatInterval);
+    };
+
     return () => {
+      clearInterval(heartbeatInterval);
       ws.close();
     };
   }, [selectedRoomId]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
   }, [uniqueMessages]);
 
   const sendMessageMutation = useMutation({
@@ -133,6 +187,14 @@ export default function Chat() {
         content,
       };
 
+      // Optimistically add message to local state
+      const tempMessage = {
+        id: `temp-${Date.now()}`,
+        ...messageData,
+        createdAt: new Date(),
+      };
+      setWsMessages(prev => [...prev, tempMessage as Message]);
+
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.send(JSON.stringify({
           type: "message",
@@ -143,6 +205,12 @@ export default function Chat() {
       }
     },
     onSuccess: () => {
+      // Update viewed timestamp when sending a message to prevent self-notification
+      if (selectedRoomId && user?.student?.id) {
+        const viewedRooms = JSON.parse(localStorage.getItem(`viewedRooms_${user.student.id}`) || '{}');
+        viewedRooms[selectedRoomId] = Date.now();
+        localStorage.setItem(`viewedRooms_${user.student.id}`, JSON.stringify(viewedRooms));
+      }
       queryClient.invalidateQueries({ queryKey: ["/api/messages", selectedRoomId] });
       queryClient.invalidateQueries({ queryKey: ["/api/chat-rooms", user?.student?.id] });
     },
@@ -373,7 +441,7 @@ export default function Chat() {
               </div>
             </div>
 
-            <ScrollArea className="flex-1 p-4">
+            <ScrollArea className="flex-1 p-4" key={`messages-${selectedRoomId}-${uniqueMessages.length}`}>
               <div className="space-y-4 max-w-4xl">
                 {messagesLoading ? (
                   <div className="text-center text-muted-foreground py-8">
