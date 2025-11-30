@@ -80,15 +80,15 @@ export function AppSidebar() {
     refetchInterval: 5000, // Poll every 5 seconds for new messages
   });
 
-  // Get the last time user visited chat page
-  const lastChatVisit = localStorage.getItem(`lastChatVisit_${user?.student?.id}`) || "0";
-  const lastVisitTime = new Date(parseInt(lastChatVisit));
+  // Get the last time user viewed each specific room
+  const viewedRooms = JSON.parse(localStorage.getItem(`viewedRooms_${user?.student?.id}`) || '{}');
 
-  // Count rooms with messages since last visit
-  const unreadCount = chatRooms.filter(room => 
-    room.lastMessageTime && 
-    new Date(room.lastMessageTime) > lastVisitTime
-  ).length;
+  // Count rooms with messages since they were last viewed
+  const unreadCount = chatRooms.filter(room => {
+    if (!room.lastMessageTime) return false;
+    const lastViewed = viewedRooms[room.id] || 0;
+    return new Date(room.lastMessageTime).getTime() > lastViewed;
+  }).length;
 
   return (
     <Sidebar>

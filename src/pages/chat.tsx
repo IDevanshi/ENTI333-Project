@@ -70,12 +70,14 @@ export default function Chat() {
     s.name.toLowerCase().includes(userSearchQuery.toLowerCase())
   );
 
-  // Mark chat as visited when user opens this page
+  // Mark specific room as viewed when user selects it
   useEffect(() => {
-    if (user?.student?.id) {
-      localStorage.setItem(`lastChatVisit_${user.student.id}`, Date.now().toString());
+    if (selectedRoomId && user?.student?.id) {
+      const viewedRooms = JSON.parse(localStorage.getItem(`viewedRooms_${user.student.id}`) || '{}');
+      viewedRooms[selectedRoomId] = Date.now();
+      localStorage.setItem(`viewedRooms_${user.student.id}`, JSON.stringify(viewedRooms));
     }
-  }, [user?.student?.id]);
+  }, [selectedRoomId, user?.student?.id]);
 
   useEffect(() => {
     if (chatRooms.length > 0 && !selectedRoomId) {
