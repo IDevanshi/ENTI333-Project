@@ -2,117 +2,172 @@
 
 ## Overview
 
-CampusConnect is a social networking platform designed to help college students build meaningful connections on campus. The application matches students based on shared courses, interests, hobbies, and goals, reducing campus loneliness through smart matching algorithms. It features event discovery, study group formation, real-time chat, campus news, and meetup location recommendations.
+CampusConnect is a social networking platform designed to help college students build meaningful connections on campus. The app matches students based on shared courses, interests, hobbies, and goals to reduce loneliness and improve campus engagement. Students can discover events, join study groups, chat in real time, browse campus news, and find meetup spots.
 
-The platform is inspired by social platforms like Instagram (visual feed), Discord (community organization), and Bumble BFF (matching interface), creating a familiar yet purpose-built experience for campus community building.
+The platform blends UX patterns inspired by Instagram (visual feed), Discord (community structure), and Bumble BFF (matching interface), creating a familiar but campus-focused experience.
 
-## User Preferences
+---
 
-Preferred communication style: Simple, everyday language.
+## Development Background
 
-## System Architecture
+The project was originally built in **Replit**, using its built-in tooling for React, TypeScript, Tailwind, and Express.
+Replit also injected platform-specific modules such as:
 
-### Frontend Architecture
+* Cartographer (source mapping),
+* Replit dev banner,
+* Automatic error overlays,
+* Replit file-system helpers.
 
-**Framework**: React with TypeScript
-- **Routing**: Wouter (lightweight client-side routing)
-- **State Management**: TanStack Query (React Query) for server state
-- **Form Handling**: React Hook Form with Zod validation
-- **UI Components**: Radix UI primitives with shadcn/ui component library
-- **Styling**: Tailwind CSS with custom design system
+Those dependencies were removed when exporting the code so the project could run **locally without Replit**.
+This required:
 
-**Design System**:
-- Typography: Inter (UI/headlines) and Work Sans (body text) via Google Fonts
-- Color scheme: Neutral-based palette with purple primary accent (262° hue)
-- Spacing: Tailwind spacing scale (2, 4, 6, 8, 12, 16)
-- Theme support: Light and dark modes via ThemeProvider
-- Component variants: Defined using class-variance-authority
+* Replacing Replit-specific imports and middleware
+* Reconfiguring Vite and Express
+* Adjusting the folder structure
+* Updating the server entry points (`index-dev.ts` and `index-prod.ts`)
+* Cleaning the build scripts in `package.json`
+* Re-adding `cross-env` manually for environment handling
+* Ensuring the WebSocket server works outside of Replit’s proxy system
 
-**Key Pages**:
-- Home: Landing page with hero and feature showcase
-- Discover: Swipeable student matching interface (Tinder/Bumble-style)
-- Events: Campus event browsing and RSVP
-- Study Groups: Course-based study group discovery and creation
-- Chat: Real-time messaging interface
-- News: Campus news and announcements
-- Meetups: Popular on-campus meeting locations
-- Profile Setup: Multi-step onboarding flow
+The project now runs fully locally and independently using standard Node.js tooling.
 
-### Backend Architecture
+---
 
-**Framework**: Express.js with TypeScript
-- **API Style**: RESTful JSON API
-- **Real-time Communication**: WebSocket server for chat functionality
-- **Development Server**: Vite middleware integration for hot module replacement
-- **Production Server**: Static file serving with SPA fallback
+## Tech Stack
 
-**API Routes**:
-- Student profiles: CRUD operations for user profiles
-- Matches: Student-to-student connection management
-- Events: Campus event creation and attendance tracking
-- Study Groups: Course-based group management
-- Chat: Room and message persistence
-- Campus News: Announcement distribution
-- Meetup Locations: Popular campus location database
+### Frontend
 
-**Session Management**:
-- Uses connect-pg-simple for PostgreSQL-backed sessions
-- Cookie-based authentication
+**Framework:** React + TypeScript
+**Core Libraries:**
 
-### Data Storage
+* Wouter for client-side routing
+* TanStack Query for fetching and caching
+* React Hook Form + Zod for type-safe form validation
+* Radix UI + shadcn/ui for accessible UI components
+* Tailwind CSS for styling
+* Lucide React for icons
+* Google Fonts (Inter, Work Sans)
 
-**Database**: PostgreSQL (via Neon serverless)
-- **ORM**: Drizzle ORM with type-safe queries
-- **Schema Management**: Drizzle Kit for migrations
-- **Connection**: WebSocket-based connection pooling for serverless compatibility
+**Key Pages & Features:**
 
-**Data Models**:
-- Users: Authentication credentials
-- Students: Extended profile information (name, year, major, bio, avatar, courses, interests, hobbies, goals, location)
-- Matches: Student-to-student connections with status tracking
-- Events: Campus events with category, attendees, capacity
-- Study Groups: Course-based groups with privacy settings and tags
-- Chat Rooms: Group messaging channels
-- Messages: Individual chat messages with sender tracking
-- Campus News: Announcements with categories and authorship
-- Meetup Locations: Popular on-campus spots with type classification
+* Home page (landing + feature overview)
+* Swipe-style matching (Discover)
+* Events browsing and RSVP
+* Study group creation and discovery
+* Real-time chat
+* Campus news feed
+* On-campus meetup locations
+* Multi-step onboarding flow
 
-**Schema Features**:
-- UUID primary keys via PostgreSQL gen_random_uuid()
-- Array fields for multi-valued attributes (courses, interests, tags)
-- Timestamp tracking for creation dates
-- Zod validation schemas generated from Drizzle schemas
+---
 
-### External Dependencies
+### Backend
 
-**Database Service**:
-- Neon Serverless PostgreSQL: Managed PostgreSQL with WebSocket support
-- Requires DATABASE_URL environment variable
+**Framework:** Express.js + TypeScript
+**Features:**
 
-**UI Component Library**:
-- Radix UI: Accessible, unstyled component primitives
-- shadcn/ui: Pre-styled component implementations
-- Lucide React: Icon library
+* REST API endpoints for all major entities
+* WebSocket server for chat
+* Vite middleware for hot reload during development
+* ESBuild-bundled production server
 
-**Development Tools**:
-- Vite: Build tool and dev server
-- Replit-specific plugins: Cartographer (source mapping), dev banner, runtime error overlay
-- ESBuild: Production bundling for server code
+**Modules:**
 
-**Font Delivery**:
-- Google Fonts CDN: Inter and Work Sans font families
+* Student profiles
+* Matches
+* Events
+* Study Groups
+* Chat rooms
+* Messages
+* Campus News
+* Meetup spots
 
-**Styling Framework**:
-- Tailwind CSS: Utility-first CSS framework
-- PostCSS with Autoprefixer: CSS processing
+**Authentication:**
 
-**Validation**:
-- Zod: Runtime type validation
-- @hookform/resolvers: Form validation integration
+* PostgreSQL-backed sessions (connect-pg-simple)
+* Cookie-based login
 
-**Date Handling**:
-- date-fns: Date formatting and manipulation
+---
 
-**Real-time**:
-- ws: WebSocket library for Node.js
-- WebSocketServer for chat functionality
+### Database Layer
+
+**Database:** PostgreSQL (Neon serverless)
+**ORM:** Drizzle ORM
+**Migrations:** Drizzle Kit
+**Connection:** WebSocket-based DB pooling
+
+**Schema Highlights:**
+
+* UUID primary keys
+* Array-based attributes (interests, courses, tags)
+* Timestamps
+* Zod schemas generated from Drizzle definitions
+
+---
+
+### External & Dev Dependencies
+
+* Neon PostgreSQL
+* Radix UI, shadcn/ui, Lucide icons
+* Vite
+* ESBuild
+* Tailwind CSS + PostCSS
+* Zod
+* date-fns
+* ws (WebSocket server)
+
+---
+
+## Running the Project Locally
+
+### 1. Navigate to the project folder
+
+Open a terminal and move into the directory that contains `package.json`:
+
+```bash
+cd path/to/CampusConnect
+```
+
+### 2. Install dependencies
+
+Run:
+
+```bash
+npm install
+```
+
+If you get errors about environment variables or `cross-env`, install it manually:
+
+```bash
+npm install cross-env
+```
+
+### 3. Start the development environment
+
+```bash
+npm run dev
+```
+
+This launches:
+
+* React frontend (Vite)
+* Express backend with WebSocket support
+* Hot module reload (HMR)
+
+### 4. Open the app in your browser
+
+```
+http://localhost:5000
+```
+
+---
+
+## Recommended Setup
+
+* Node.js 18+
+* VS Code
+
+  * Tailwind CSS IntelliSense
+  * Prettier
+  * TypeScript extension
+* PostgreSQL database (Neon recommended)
